@@ -12,6 +12,7 @@ const taskRoutes = require("./routes/taskRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const teamRoutes = require("./routes/teamRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const {
   notFound,
@@ -58,6 +59,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/team", teamRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Error handling must come after all routes
 app.use(notFound);

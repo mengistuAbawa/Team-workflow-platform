@@ -1,4 +1,3 @@
-
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -10,20 +9,42 @@ import {
   MessageCircle,
   Settings,
   Zap,
-  X
+  X,
+  ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
 
-const links = [
-  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+// Static links shown to every authenticated user. The dashboard entry is
+// injected dynamically below based on the user's role.
+const commonLinks = [
   { label: "Projects", path: "/projects", icon: FolderKanban },
   { label: "My Tasks", path: "/tasks", icon: CheckSquare },
   { label: "Team", path: "/team", icon: Users },
   { label: "Messages", path: "/messages", icon: MessageCircle },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
-  { label: "Notifications", path: "/notifications", icon: Bell }
+  { label: "Notifications", path: "/notifications", icon: Bell },
 ];
 
+const dashboardLabels = {
+  admin: "Admin Console",
+  manager: "Manager Dashboard",
+  member: "Dashboard",
+};
+
+const dashboardIcons = {
+  admin: ShieldCheck,
+  manager: ClipboardList,
+  member: LayoutDashboard,
+};
+
 export default function Sidebar({ open, onClose }) {
+  const { user } = useAuth();
+  const role = user?.role || "member";
+  const dashboardPath = getRoleDashboardPath(role);
+  const DashboardIcon = dashboardIcons[role] || LayoutDashboard;
+  const dashboardLabel = dashboardLabels[role] || "Dashboard";
   return (
     <>
       {open && (
@@ -65,7 +86,40 @@ export default function Sidebar({ open, onClose }) {
           </p>
 
           <nav className="space-y-1">
-            {links.map(({ label, path, icon: Icon }) => (
+            <NavLink
+              to={dashboardPath}
+              onClick={onClose}
+              end
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-violet-600 text-white shadow-lg shadow-violet-950/20"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                }`
+              }
+            >
+              <DashboardIcon size={19} strokeWidth={1.8} />
+              <span>{dashboardLabel}</span>
+            </NavLink>
+
+            {role === "admin" && (
+              <NavLink
+                to="/manager/dashboard"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
+                    isActive
+                      ? "bg-violet-600 text-white shadow-lg shadow-violet-950/20"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  }`
+                }
+              >
+                <ClipboardList size={19} strokeWidth={1.8} />
+                <span>Manager View</span>
+              </NavLink>
+            )}
+
+            {commonLinks.map(({ label, path, icon: Icon }) => (
               <NavLink
                 key={path}
                 to={path}
@@ -115,4 +169,3 @@ export default function Sidebar({ open, onClose }) {
     </>
   );
 }
-

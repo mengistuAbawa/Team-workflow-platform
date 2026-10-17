@@ -1,4 +1,3 @@
-
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 
@@ -57,9 +56,14 @@ router.post(
       .withMessage("Password must be text.")
       .isLength({ min: 8, max: 72 })
       .withMessage("Password must be 8-72 characters."),
+
+    body("role")
+      .optional()
+      .isIn(["admin", "manager", "member"])
+      .withMessage("Role must be admin, manager, or member."),
   ],
   checkValidation,
-  register
+  register,
 );
 
 // Login
@@ -71,13 +75,10 @@ router.post(
       .withMessage("Enter a valid email.")
       .normalizeEmail(),
 
-    body("password")
-      .isString()
-      .withMessage("Password is required.")
-      .notEmpty(),
+    body("password").isString().withMessage("Password is required.").notEmpty(),
   ],
   checkValidation,
-  login
+  login,
 );
 
 // Current authenticated user
@@ -90,12 +91,6 @@ router.patch("/profile", authenticate, updateProfile);
 router.post("/change-password", authenticate, changePassword);
 
 // Admin creates a user account
-router.post(
-  "/users",
-  authenticate,
-  authorize("admin"),
-  createUser
-);
+router.post("/users", authenticate, authorize("admin"), createUser);
 
 module.exports = router;
-

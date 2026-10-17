@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 import {
   Check,
@@ -68,6 +67,7 @@ export default function KanbanBoard({
   onCreateTask,
   updatingTaskId = null,
   loading = false,
+  canApprove = true,
 }) {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -80,8 +80,7 @@ export default function KanbanBoard({
     return safeTasks.filter((task) => {
       const matchesPriority =
         priorityFilter === "all" ||
-        String(task.priority || "medium").toLowerCase() ===
-          priorityFilter;
+        String(task.priority || "medium").toLowerCase() === priorityFilter;
 
       const searchableText = [
         task.title,
@@ -100,7 +99,7 @@ export default function KanbanBoard({
   const groupedTasks = useMemo(() => {
     return COLUMNS.reduce((groups, column) => {
       groups[column.id] = filteredTasks.filter(
-        (task) => normalizeStatus(task.status) === column.id
+        (task) => normalizeStatus(task.status) === column.id,
       );
 
       return groups;
@@ -120,9 +119,7 @@ export default function KanbanBoard({
       {/* Board toolbar */}
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-bold text-slate-900">
-            Task board
-          </h2>
+          <h2 className="text-base font-bold text-slate-900">Task board</h2>
           <p className="mt-1 text-sm text-slate-500">
             {filteredTasks.length}{" "}
             {filteredTasks.length === 1 ? "task" : "tasks"} displayed
@@ -239,7 +236,10 @@ export default function KanbanBoard({
                       )}
 
                       <div className="mt-2 flex items-center justify-between gap-2 px-1">
-                        <label className="sr-only" htmlFor={`status-${task.id}`}>
+                        <label
+                          className="sr-only"
+                          htmlFor={`status-${task.id}`}
+                        >
                           Change status for {task.title}
                         </label>
 
@@ -247,17 +247,20 @@ export default function KanbanBoard({
                           id={`status-${task.id}`}
                           value={normalizeStatus(task.status)}
                           disabled={
-                            !onTaskStatusChange ||
-                            updatingTaskId === task.id
+                            !onTaskStatusChange || updatingTaskId === task.id
                           }
                           onChange={(event) =>
                             handleStatusChange(task, event.target.value)
                           }
                           className="min-w-0 max-w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {COLUMNS.map((option) => (
+                          {COLUMNS.filter(
+                            (option) => canApprove || option.id !== "done",
+                          ).map((option) => (
                             <option key={option.id} value={option.id}>
-                              Move to {option.title}
+                              {!canApprove && option.id === "in_review"
+                                ? "Submit for Review"
+                                : `Move to ${option.title}`}
                             </option>
                           ))}
                         </select>

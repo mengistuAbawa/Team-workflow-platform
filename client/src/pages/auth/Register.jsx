@@ -1,8 +1,47 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Zap, ArrowRight } from "lucide-react";
+import {
+  Zap,
+  ArrowRight,
+  ShieldCheck,
+  ClipboardList,
+  User,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
+
+const roleOptions = [
+  {
+    value: "member",
+    label: "Team Member",
+    icon: User,
+    description: "Execute tasks, collaborate, and track progress.",
+    accent: "text-emerald-600",
+    ring: "focus:ring-emerald-100",
+    border: "border-emerald-300",
+    bg: "bg-emerald-50",
+  },
+  {
+    value: "manager",
+    label: "Manager",
+    icon: ClipboardList,
+    description: "Create projects, assign tasks, and review work.",
+    accent: "text-blue-600",
+    ring: "focus:ring-blue-100",
+    border: "border-blue-300",
+    bg: "bg-blue-50",
+  },
+  {
+    value: "admin",
+    label: "Administrator",
+    icon: ShieldCheck,
+    description: "Full system control — manage all users and settings.",
+    accent: "text-purple-600",
+    ring: "focus:ring-purple-100",
+    border: "border-purple-300",
+    bg: "bg-purple-50",
+  },
+];
 
 export default function Register() {
   const { register } = useAuth();
@@ -12,7 +51,8 @@ export default function Register() {
     fullName: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    role: "member",
   });
 
   const [error, setError] = useState("");
@@ -21,7 +61,7 @@ export default function Register() {
   function updateField(event) {
     setForm((current) => ({
       ...current,
-      [event.target.name]: event.target.value
+      [event.target.name]: event.target.value,
     }));
   }
 
@@ -42,17 +82,18 @@ export default function Register() {
     setSubmitting(true);
 
     try {
-      await register({
+      const newUser = await register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        password: form.password
+        password: form.password,
+        role: form.role,
       });
 
-      navigate("/dashboard", { replace: true });
+      navigate(getRoleDashboardPath(newUser.role), { replace: true });
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Unable to create your account. Please try again."
+          "Unable to create your account. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -168,6 +209,69 @@ export default function Register() {
               placeholder="Enter your password again"
               className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
             />
+          </div>
+
+          <div>
+            <span className="mb-2 block text-sm font-medium text-slate-700">
+              Select your role
+            </span>
+            <div className="space-y-2.5">
+              {roleOptions.map((option) => {
+                const Icon = option.icon;
+                const selected = form.role === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setForm((current) => ({ ...current, role: option.value }))
+                    }
+                    aria-pressed={selected}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
+                      selected
+                        ? `${option.border} ${option.bg} ring-2 ${option.ring}`
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
+                        selected ? option.bg : "bg-slate-100"
+                      } ${selected ? option.accent : "text-slate-500"}`}
+                    >
+                      <Icon size={19} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-sm font-semibold ${
+                          selected ? option.accent : "text-slate-800"
+                        }`}
+                      >
+                        {option.label}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {option.description}
+                      </p>
+                    </div>
+                    <span
+                      className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                        selected
+                          ? `${option.border} ${option.bg}`
+                          : "border-slate-300"
+                      }`}
+                    >
+                      {selected && (
+                        <span
+                          className={`size-2.5 rounded-full ${option.bg
+                            .replace("bg-", "bg-")
+                            .replace("50", "500")}`}
+                        />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button

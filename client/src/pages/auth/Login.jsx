@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Zap, ArrowRight } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,7 +17,7 @@ export default function Login() {
   function updateField(event) {
     setForm((current) => ({
       ...current,
-      [event.target.name]: event.target.value
+      [event.target.name]: event.target.value,
     }));
   }
 
@@ -27,14 +27,15 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await login(form);
-      navigate(location.state?.from?.pathname || "/dashboard", {
-        replace: true
-      });
+      const loggedInUser = await login(form);
+      const redirectTo =
+        location.state?.from?.pathname ||
+        getRoleDashboardPath(loggedInUser.role);
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Unable to sign in. Check your connection and try again."
+          "Unable to sign in. Check your connection and try again.",
       );
     } finally {
       setSubmitting(false);

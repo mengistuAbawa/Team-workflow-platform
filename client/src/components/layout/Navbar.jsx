@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Menu, Search, ChevronDown } from "lucide-react";
@@ -75,19 +74,52 @@ export default function Navbar({ onMenuClick }) {
           </button>
 
           {profileOpen && (
-            <div className="absolute right-0 top-14 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+            <div className="absolute right-0 top-14 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+              <div className="border-b border-slate-100 px-3 pb-2 pt-1">
+                <p className="text-sm font-semibold text-slate-800">
+                  {user?.full_name || "Team Member"}
+                </p>
+                <p className="text-xs capitalize text-slate-500">
+                  {user?.role || "member"}
+                </p>
+              </div>
+
+              {user?.role === "admin" && (
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/admin/dashboard");
+                  }}
+                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-purple-700 hover:bg-purple-50"
+                >
+                  Admin Console
+                </button>
+              )}
+
+              {user?.role === "manager" && (
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/manager/dashboard");
+                  }}
+                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Manager Dashboard
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setProfileOpen(false);
                   navigate("/settings");
                 }}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+                className="flex w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
               >
                 Account settings
               </button>
               <button
                 onClick={logout}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
               >
                 Sign out
               </button>
