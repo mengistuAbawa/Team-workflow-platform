@@ -11,10 +11,10 @@ while using PostgreSQL connections and positional parameters internally.
 
 ## Render deployment
 
-The root `render.yaml` declares a Render Blueprint for the API, PostgreSQL
-database, and static React client. Render injects the database connection URL
-and generated JWT secret; the API enables TLS for its database connection and
-allows requests from the deployed client host. The API runs from the repository
-root so its startup migration can access `database/schema.sql`; its npm
-commands execute from `server/`. Local deployments can continue to use the
-individual `DB_*` variables in `server/.env`.
+The root `render.yaml` declares a Render Blueprint for the API and static React
+client. Configure the Neon `DATABASE_URL` as a secret on the Render API service;
+the Blueprint generates a JWT secret and allows requests from the deployed
+client host. The API runs from the repository root so its startup migration can
+access `database/schema.sql`; its npm commands execute from `server/`. Local
+deployments can continue to use the individual `DB_*` variables in
+`server/.env`.

@@ -6,6 +6,12 @@ require("dotenv").config({
 const { Pool } = require("pg");
 
 const databaseUrl = process.env.DATABASE_URL;
+if (process.env.NODE_ENV === "production" && !databaseUrl) {
+  throw new Error(
+    "DATABASE_URL is required in production. Set the Neon connection string in the hosting provider's environment variables.",
+  );
+}
+
 const pool = new Pool({
   ...(databaseUrl
     ? { connectionString: databaseUrl }

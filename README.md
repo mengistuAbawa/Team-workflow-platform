@@ -34,17 +34,21 @@ local; it is excluded from version control.
 
 ## Deploying to Render
 
-The root [`render.yaml`](./render.yaml) Blueprint defines the API, PostgreSQL
-database, and static client. In Render, create a new Blueprint from this
-repository and review the services before applying it. The Blueprint generates
-a JWT secret and uses Render's internal PostgreSQL connection. The initial
-configuration uses Render's free plans to avoid unexpected charges; those
-plans have sleep, storage, and expiration limits and are intended for testing,
-not production. Select appropriate paid plans before deploying production
-workloads.
+The root [`render.yaml`](./render.yaml) Blueprint defines the API and static
+client. In Render, create or sync the Blueprint, then set `DATABASE_URL` on the
+API service to the Neon connection string from the Neon dashboard. This value
+is a secret and is deliberately not stored in Git. The Blueprint generates a
+JWT secret. Its initial service plan is free; free services have usage and
+availability limits and are intended for testing, not production. Select an
+appropriate paid plan before deploying production workloads.
 
 The API service runs from the repository root so its startup migration can read
 `database/schema.sql`; the client remains rooted in `client/`.
+
+For an existing Render service, open **Environment** for `teamflow-api`, set
+`DATABASE_URL` to the Neon connection string, and choose **Save, rebuild, and
+deploy**. Keep the Neon URL in the API environment only, not in a client
+variable.
 
 The API applies `database/schema.sql` during startup. Existing MySQL/XAMPP data
 is not imported automatically; migrate and verify any production data before

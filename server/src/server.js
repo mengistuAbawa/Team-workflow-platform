@@ -9,9 +9,11 @@ const PORT = Number(process.env.PORT || 5000);
 async function startServer() {
   try {
     const connection = await pool.getConnection();
-
-    await connection.ping();
-    connection.release();
+    try {
+      await connection.ping();
+    } finally {
+      connection.release();
+    }
 
     const migrate = require("./config/migrate");
     await migrate();
@@ -21,7 +23,13 @@ async function startServer() {
       console.log(`Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (error) {
-    console.error("Unable to start TeamFlow:", error.message);
+    const details = error instanceof Error
+      ? `${error.name}: ${error.message || "No error message provided."}\n${error.stack || ""}`
+      : String(error);
+    console.error(`Unable to start TeamFlow:\n${details}`);
+    await pool.end().catch((closeError) => {
+      console.error("Unable to close database pool after startup failure:", closeError.message);
+    });
     process.exit(1);
   }
 }
