@@ -43,6 +43,9 @@ plans have sleep, storage, and expiration limits and are intended for testing,
 not production. Select appropriate paid plans before deploying production
 workloads.
 
+The API service runs from the repository root so its startup migration can read
+`database/schema.sql`; the client remains rooted in `client/`.
+
 The API applies `database/schema.sql` during startup. Existing MySQL/XAMPP data
 is not imported automatically; migrate and verify any production data before
 switching users to the deployed application.
