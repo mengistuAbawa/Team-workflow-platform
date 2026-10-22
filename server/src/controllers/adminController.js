@@ -105,7 +105,8 @@ async function createUser(req, res, next) {
 
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, role, is_active)
-       VALUES (?, ?, ?, ?, 1)`,
+       VALUES (?, ?, ?, ?, 1)
+       RETURNING id`,
       [fullName, email, passwordHash, role]
     );
 
@@ -120,7 +121,7 @@ async function createUser(req, res, next) {
       data: { user: created[0] },
     });
   } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
+    if (error.code === "23505") {
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists.",

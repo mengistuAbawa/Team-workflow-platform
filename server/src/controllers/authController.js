@@ -70,7 +70,8 @@ async function register(req, res, next) {
 
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, role)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?)
+       RETURNING id`,
       [fullName, email, passwordHash, role],
     );
 
@@ -90,7 +91,7 @@ async function register(req, res, next) {
       data: { user, token },
     });
   } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
+    if (error.code === "23505") {
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists.",
@@ -146,7 +147,8 @@ async function createUser(req, res, next) {
     const passwordHash = await bcrypt.hash(password, 12);
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, role)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?)
+       RETURNING id`,
       [fullName, email, passwordHash, role],
     );
 
@@ -156,7 +158,7 @@ async function createUser(req, res, next) {
       data: { user: { id: result.insertId, full_name: fullName, email, role } },
     });
   } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
+    if (error.code === "23505") {
       return res
         .status(409)
         .json({

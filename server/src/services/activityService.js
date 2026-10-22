@@ -12,7 +12,8 @@ const activityService = {
     const [result] = await pool.execute(
       `INSERT INTO activity_logs
         (project_id, task_id, user_id, action, details)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         project_id,
         task_id,

@@ -20,6 +20,13 @@ const {
 } = require("./middleware/errorHandler");
 
 const app = express();
+const clientAddress =
+  process.env.CLIENT_URL ||
+  process.env.CLIENT_HOST ||
+  "http://localhost:5173";
+const clientOrigin = new URL(
+  clientAddress.includes("://") ? clientAddress : `https://${clientAddress}`,
+).origin;
 
 // Security and request middleware
 app.disable("x-powered-by");
@@ -27,7 +34,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: clientOrigin,
   })
 );
 
@@ -66,5 +73,3 @@ app.use(notFound);
 app.use(errorHandler);
 
 module.exports = app;
-
-

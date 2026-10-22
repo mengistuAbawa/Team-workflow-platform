@@ -10,7 +10,8 @@ const notificationService = {
   }) {
     const [result] = await pool.execute(
       `INSERT INTO notifications (user_id, title, message, link)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?)
+       RETURNING id`,
       [user_id, title, message, link]
     );
 
@@ -26,17 +27,23 @@ const notificationService = {
 
     if (!uniqueIds.length) return 0;
 
-    const values = uniqueIds.map((userId) => [
+    const values = uniqueIds.flatMap((userId) => [
       userId,
       notification.title,
       notification.message,
       notification.link || null,
     ]);
 
+    const placeholders = uniqueIds
+      .map((_, index) => {
+        const offset = index * 4;
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`;
+      })
+      .join(", ");
     const [result] = await pool.query(
       `INSERT INTO notifications (user_id, title, message, link)
-       VALUES ?`,
-      [values]
+       VALUES ${placeholders}`,
+      values
     );
 
     return result.affectedRows;

@@ -83,7 +83,7 @@ const createConversation = handle(async (req, res) => {
     try {
       await connection.beginTransaction();
       const [result] = await connection.execute(
-        "INSERT INTO conversations (conversation_type, created_by) VALUES ('private', ?)",
+        "INSERT INTO conversations (conversation_type, created_by) VALUES ('private', ?) RETURNING id",
         [req.user.id]
       );
       await connection.execute(
@@ -120,20 +120,25 @@ const createConversation = handle(async (req, res) => {
       let conversationId = found[0]?.id;
       if (!conversationId) {
         const [result] = await connection.execute(
-          "INSERT INTO conversations (project_id, conversation_type, created_by) VALUES (?, 'project', ?)",
+          "INSERT INTO conversations (project_id, conversation_type, created_by) VALUES (?, 'project', ?) RETURNING id",
           [projectId, req.user.id]
         );
         conversationId = result.insertId;
       }
-      await connection.execute("INSERT IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?)", [conversationId, req.user.id]);
       await connection.execute(
-        `INSERT IGNORE INTO conversation_members (conversation_id, user_id)
-         SELECT ?, p.owner_id FROM projects p WHERE p.id = ?`,
+        "INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+        [conversationId, req.user.id]
+      );
+      await connection.execute(
+        `INSERT INTO conversation_members (conversation_id, user_id)
+         SELECT ?, p.owner_id FROM projects p WHERE p.id = ?
+         ON CONFLICT DO NOTHING`,
         [conversationId, projectId]
       );
       await connection.execute(
-        `INSERT IGNORE INTO conversation_members (conversation_id, user_id)
-         SELECT ?, pm.user_id FROM project_members pm WHERE pm.project_id = ?`,
+        `INSERT INTO conversation_members (conversation_id, user_id)
+         SELECT ?, pm.user_id FROM project_members pm WHERE pm.project_id = ?
+         ON CONFLICT DO NOTHING`,
         [conversationId, projectId]
       );
       await connection.commit();
@@ -150,20 +155,23 @@ const createConversation = handle(async (req, res) => {
   if (!cleanName || cleanName.length > 150) return fail(res, 400, "Group name is required (up to 150 characters).");
   const ids = [...new Set([req.user.id, ...(Array.isArray(req.body.member_ids) ? req.body.member_ids : [])].map(Number))];
   if (ids.some((id) => !isValidId(id))) return fail(res, 400, "Invalid group member ID.");
-  const placeholders = ids.map(() => "?").join(",");
-  const [users] = await pool.execute(`SELECT id FROM users WHERE is_active = 1 AND id IN (${placeholders})`, ids);
+  const idPlaceholders = ids.map((_, index) => `$${index + 1}`).join(", ");
+  const memberPlaceholders = ids
+    .map((_, index) => `($1, $${index + 2})`)
+    .join(", ");
+  const [users] = await pool.execute(`SELECT id FROM users WHERE is_active = 1 AND id IN (${idPlaceholders})`, ids);
   if (users.length !== ids.length) return fail(res, 400, "All group members must be active users.");
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const [result] = await connection.execute(
-      "INSERT INTO conversations (conversation_type, name, created_by) VALUES ('group', ?, ?)",
+      "INSERT INTO conversations (conversation_type, name, created_by) VALUES ('group', ?, ?) RETURNING id",
       [cleanName, req.user.id]
     );
     await connection.query(
-      "INSERT INTO conversation_members (conversation_id, user_id) VALUES ?",
-      [ids.map((id) => [result.insertId, id])]
+      `INSERT INTO conversation_members (conversation_id, user_id) VALUES ${memberPlaceholders}`,
+      [result.insertId, ...ids]
     );
     await connection.commit();
     res.status(201).json({ success: true, data: { conversation_id: result.insertId } });
@@ -184,7 +192,7 @@ const getMessages = handle(async (req, res) => {
     `INSERT INTO message_reads (message_id, user_id)
      SELECT id, ? FROM messages
      WHERE conversation_id = ? AND sender_id <> ?
-     ON DUPLICATE KEY UPDATE read_at = CURRENT_TIMESTAMP`,
+     ON CONFLICT (message_id, user_id) DO UPDATE SET read_at = CURRENT_TIMESTAMP`,
     [req.user.id, id, req.user.id]
   );
   const [messages] = await pool.execute(
@@ -205,7 +213,7 @@ const sendMessage = handle(async (req, res) => {
   const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
   if (!content || content.length > 10000) return fail(res, 400, "Message is required and must be at most 10,000 characters.");
   const [result] = await pool.execute(
-    "INSERT INTO messages (conversation_id, sender_id, message_type, content) VALUES (?, ?, 'text', ?)",
+    "INSERT INTO messages (conversation_id, sender_id, message_type, content) VALUES (?, ?, 'text', ?) RETURNING id",
     [id, req.user.id, content]
   );
   await pool.execute("UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
@@ -236,16 +244,18 @@ const addConversationMembers = handle(async (req, res) => {
   } else if (Number(conversation.created_by) !== Number(req.user.id) && req.user.role !== "admin") {
     return fail(res, 403, "Only the group creator can add collaborators.");
   }
-  const placeholders = userIds.map(() => "?").join(",");
+  const placeholders = userIds.map((_, index) => `$${index + 1}`).join(",");
   const [users] = await pool.execute(`SELECT id FROM users WHERE is_active = 1 AND id IN (${placeholders})`, userIds);
   if (users.length !== userIds.length) return fail(res, 400, "All collaborators must be active users.");
-  await pool.query("INSERT IGNORE INTO conversation_members (conversation_id, user_id) VALUES ?", [userIds.map((userId) => [id, userId])]);
+  const memberValues = userIds.map((userId, index) => `($1, $${index + 2})`).join(", ");
+  await pool.query(
+    `INSERT INTO conversation_members (conversation_id, user_id)
+     VALUES ${memberValues} ON CONFLICT DO NOTHING`,
+    [id, ...userIds]
+  );
   res.status(201).json({ success: true, message: "Collaborators added." });
 });
 
 module.exports = { listConversations, createConversation, getMessages, sendMessage, addConversationMembers };
-
-
-
 
 

@@ -4,7 +4,7 @@ const pool = require("../config/db");
 const taskService = {
   async findById(taskId) {
     const [rows] = await pool.execute(
-      `SELECT t.*,
+      `SELECT DISTINCT t.*,
               p.name AS project_name,
               assignee.full_name AS assignee_name,
               assignee.avatar AS assignee_avatar,
@@ -85,7 +85,6 @@ const taskService = {
        LEFT JOIN users assignee ON assignee.id = t.assignee_id
        LEFT JOIN users creator ON creator.id = t.created_by
        ${where}
-       GROUP BY t.id
        ORDER BY t.position ASC, t.created_at DESC`,
       [userId, ...values]
     );
@@ -109,7 +108,8 @@ const taskService = {
       `INSERT INTO tasks
         (project_id, title, description, status, priority,
          assignee_id, created_by, due_date, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         project_id,
         title.trim(),

@@ -30,7 +30,7 @@ const projectService = {
        LEFT JOIN tasks t ON t.project_id = p.id
        LEFT JOIN project_members pm ON pm.project_id = p.id
        WHERE (? = 1 OR p.owner_id = ? OR pm.user_id = ?)
-       GROUP BY p.id
+       GROUP BY p.id, u.full_name
        ORDER BY p.updated_at DESC`,
       [isAdmin ? 1 : 0, userId, userId]
     );
@@ -56,7 +56,8 @@ const projectService = {
       const [result] = await connection.execute(
         `INSERT INTO projects
           (name, description, color, status, start_date, due_date, owner_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         RETURNING id`,
         [
           name.trim(),
           description,
@@ -155,7 +156,8 @@ const projectService = {
       `INSERT INTO project_members
         (project_id, user_id, project_role)
        VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE project_role = VALUES(project_role)`,
+       ON CONFLICT (project_id, user_id)
+       DO UPDATE SET project_role = EXCLUDED.project_role`,
       [projectId, userId, projectRole]
     );
 

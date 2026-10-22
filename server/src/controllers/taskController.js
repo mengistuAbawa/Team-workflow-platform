@@ -171,7 +171,8 @@ exports.createTask = async (req, res, next) => {
       `INSERT INTO tasks
         (project_id, title, description, status, priority,
          assignee_id, created_by, due_date, position)
-       VALUES (?, ?, ?, 'todo', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'todo', ?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         Number(project_id),
         title.trim(),
