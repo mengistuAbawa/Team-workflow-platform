@@ -37,6 +37,7 @@ pids/
 # Testing and coverage
 coverage/
 .nyc_output/
+.tsupgrader/
 
 # Editor settings
 .vscode/

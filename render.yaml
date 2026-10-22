@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: teamflow-api
+    name: team-workflow-platform
     runtime: node
-    buildCommand: cd server && npm ci
-    startCommand: cd server && npm start
+    buildCommand: npm --prefix client ci && VITE_API_URL=/api npm --prefix client run build && npm --prefix server ci
+    startCommand: npm --prefix server start
     plan: free
     region: oregon
     healthCheckPath: /api/health
@@ -14,25 +14,3 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: CLIENT_HOST
-        fromService:
-          type: web
-          name: teamflow-client
-          property: host
-
-  - type: web
-    name: teamflow-client
-    runtime: static
-    rootDir: client
-    buildCommand: npm ci && VITE_API_URL="https://${API_HOST}/api" npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: API_HOST
-        fromService:
-          type: web
-          name: teamflow-api
-          property: host
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

@@ -34,21 +34,29 @@ local; it is excluded from version control.
 
 ## Deploying to Render
 
-The root [`render.yaml`](./render.yaml) Blueprint defines the API and static
-client. In Render, create or sync the Blueprint, then set `DATABASE_URL` on the
-API service to the Neon connection string from the Neon dashboard. This value
-is a secret and is deliberately not stored in Git. The Blueprint generates a
-JWT secret. Its initial service plan is free; free services have usage and
-availability limits and are intended for testing, not production. Select an
-appropriate paid plan before deploying production workloads.
+The root [`render.yaml`](./render.yaml) Blueprint deploys the React client and
+API together on one Render web service. The app is available at `/` and its API
+at `/api`. Set `DATABASE_URL` on the Render service to the Neon connection
+string from the Neon dashboard; this secret is deliberately not stored in Git.
+The Blueprint generates a JWT secret. Its initial service plan is free; free
+services have usage and availability limits and are intended for testing, not
+production. Select an appropriate paid plan before deploying production
+workloads.
 
-The API service runs from the repository root so its startup migration can read
-`database/schema.sql`; the client remains rooted in `client/`.
+The service must use the repository root as its root directory so the build
+can include the client and the API startup migration can read
+`database/schema.sql`. The Blueprint builds the client into `client/dist` and
+then starts the API.
 
-For an existing Render service, open **Environment** for `teamflow-api`, set
-`DATABASE_URL` to the Neon connection string, and choose **Save, rebuild, and
-deploy**. Keep the Neon URL in the API environment only, not in a client
-variable.
+For an existing Render service, update **Settings → Build & Deploy**:
+
+- Clear **Root Directory** (leave it blank so it uses the repository root).
+- Set **Build Command** to
+  `npm --prefix client ci && VITE_API_URL=/api npm --prefix client run build && npm --prefix server ci`.
+- Set **Start Command** to `npm --prefix server start`.
+- In **Environment**, set `DATABASE_URL` to the Neon connection string and
+  `NODE_ENV` to `production`. Keep the Neon URL on the server service only.
+- Save and deploy the latest commit.
 
 The API applies `database/schema.sql` during startup. Existing MySQL/XAMPP data
 is not imported automatically; migrate and verify any production data before

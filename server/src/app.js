@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const path = require("node:path");
 
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -67,6 +68,21 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/admin", adminRoutes);
+
+if (process.env.NODE_ENV === "production") {
+  const clientBuildPath = path.resolve(__dirname, "../../client/dist");
+
+  app.use(express.static(clientBuildPath));
+  app.get("/{*path}", (req, res, next) => {
+    if (req.path === "/api" || req.path.startsWith("/api/")) {
+      return next();
+    }
+
+    res.sendFile(path.join(clientBuildPath, "index.html"), (error) => {
+      if (error) next(error);
+    });
+  });
+}
 
 // Error handling must come after all routes
 app.use(notFound);
