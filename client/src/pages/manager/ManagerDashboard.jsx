@@ -95,11 +95,23 @@ function daysUntil(date) {
   return diff;
 }
 
+const emptyTaskForm = {
+  project_id: "",
+  title: "",
+  description: "",
+  assignee_id: "",
+  priority: "medium",
+  due_date: "",
+};
+
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sendTaskOpen, setSendTaskOpen] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [taskForm, setTaskForm] = useState(emptyTaskForm);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -187,6 +199,55 @@ export default function ManagerDashboard() {
     });
     return Object.values(workload).sort((a, b) => b.total - a.total);
   }, [tasks]);
+
+  function openSendTask(task = null) {
+    setSendTaskOpen(true);
+    setTaskForm({
+      ...emptyTaskForm,
+      project_id: task?.project_id ? String(task.project_id) : "",
+      assignee_id: task?.assignee_id ? String(task.assignee_id) : "",
+      title: task?.title || task?.name || "",
+      description: task?.description || "",
+      priority: task?.priority || "medium",
+      due_date: task?.due_date || "",
+    });
+  }
+
+  function updateTaskForm(event) {
+    const { name, value } = event.target;
+    setTaskForm((current) => ({ ...current, [name]: value }));
+  }
+
+  async function handleSendTaskSubmit(event) {
+    event.preventDefault();
+    setError("");
+
+    if (!taskForm.project_id || !taskForm.title.trim() || !taskForm.assignee_id) {
+      setError("Choose a project, team member, and task title before sending the task.");
+      return;
+    }
+
+    setCreatingTask(true);
+
+    try {
+      await api.post("/tasks", {
+        project_id: Number(taskForm.project_id),
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim(),
+        assignee_id: Number(taskForm.assignee_id),
+        priority: taskForm.priority,
+        due_date: taskForm.due_date || null,
+      });
+
+      setTaskForm(emptyTaskForm);
+      setSendTaskOpen(false);
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not send this task to the team.");
+    } finally {
+      setCreatingTask(false);
+    }
+  }
 
   if (loading && !data) {
     return (
@@ -490,16 +551,18 @@ export default function ManagerDashboard() {
                   (task.assignee ? [task.assignee] : []);
 
                 return (
-                  <Link
+                  <div
                     key={task.id || task._id}
-                    to={
-                      task.project_id
-                        ? `/projects/${task.project_id}`
-                        : "/tasks"
-                    }
                     className="flex items-start gap-4 p-4 transition hover:bg-slate-50"
                   >
-                    <div className="min-w-0 flex-1">
+                    <Link
+                      to={
+                        task.project_id
+                          ? `/projects/${task.project_id}`
+                          : "/tasks"
+                      }
+                      className="min-w-0 flex-1"
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold text-slate-900">
                           {task.title || task.name}
@@ -525,26 +588,39 @@ export default function ManagerDashboard() {
                           </span>
                         )}
                       </div>
-                    </div>
-                    <div className="flex shrink-0 -space-x-2">
-                      {members.slice(0, 3).map((member, i) => (
-                        <span
-                          key={member.id || i}
-                          title={member.full_name || member.name}
-                          className={`flex size-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-slate-700 ${
-                            avatarColors[i % avatarColors.length]
-                          }`}
-                        >
-                          {initials(member.full_name || member.name || `M${i}`)}
-                        </span>
-                      ))}
-                      {members.length > 3 && (
-                        <span className="flex size-7 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[9px] font-bold text-white">
-                          +{members.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
+
+                      <div className="mt-3 flex shrink-0 -space-x-2">
+                        {members.slice(0, 3).map((member, i) => (
+                          <span
+                            key={member.id || i}
+                            title={member.full_name || member.name}
+                            className={`flex size-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-slate-700 ${
+                              avatarColors[i % avatarColors.length]
+                            }`}
+                          >
+                            {initials(member.full_name || member.name || `M${i}`)}
+                          </span>
+                        ))}
+                        {members.length > 3 && (
+                          <span className="flex size-7 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[9px] font-bold text-white">
+                            +{members.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openSendTask(task);
+                      }}
+                      className="mt-1 inline-flex items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      Send task
+                    </button>
+                  </div>
                 );
               })}
 
@@ -674,56 +750,74 @@ export default function ManagerDashboard() {
                   priorityStyles[priority] || priorityStyles.medium;
 
                 return (
-                  <Link
+                  <div
                     key={task.id || task._id}
-                    to={
-                      task.project_id
-                        ? `/projects/${task.project_id}`
-                        : "/tasks"
-                    }
                     className="flex items-start gap-3 p-4 transition hover:bg-slate-50"
                   >
-                    <Flag
-                      size={16}
-                      className={`mt-0.5 shrink-0 ${
-                        isOverdue
-                          ? "text-rose-500"
-                          : isSoon
-                          ? "text-amber-500"
-                          : "text-slate-300"
-                      }`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {task.title || task.name}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span
-                          className={`text-xs font-medium ${
-                            isOverdue
-                              ? "text-rose-600"
-                              : isSoon
-                              ? "text-amber-600"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {isOverdue
-                            ? `${Math.abs(days)} day(s) overdue`
-                            : days === 0
-                            ? "Due today"
-                            : `${days} day(s) left`}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {formatDate(task.due_date)}
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold capitalize ${priorityClass}`}
+                    <Link
+                      to={
+                        task.project_id
+                          ? `/projects/${task.project_id}`
+                          : "/tasks"
+                      }
+                      className="flex min-w-0 flex-1 items-start gap-3"
                     >
-                      {priority}
-                    </span>
-                  </Link>
+                      <Flag
+                        size={16}
+                        className={`mt-0.5 shrink-0 ${
+                          isOverdue
+                            ? "text-rose-500"
+                            : isSoon
+                            ? "text-amber-500"
+                            : "text-slate-300"
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {task.title || task.name}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span
+                            className={`text-xs font-medium ${
+                              isOverdue
+                                ? "text-rose-600"
+                                : isSoon
+                                ? "text-amber-600"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {isOverdue
+                              ? `${Math.abs(days)} day(s) overdue`
+                              : days === 0
+                              ? "Due today"
+                              : `${days} day(s) left`}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {formatDate(task.due_date)}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span
+                        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold capitalize ${priorityClass}`}
+                      >
+                        {priority}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openSendTask(task);
+                        }}
+                        className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:bg-violet-100"
+                      >
+                        Send task
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
 
@@ -773,6 +867,143 @@ export default function ManagerDashboard() {
           </section>
         </div>
       </div>
+
+      {sendTaskOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-violet-600">
+                  Task dispatch
+                </p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                  Send task to team
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSendTaskOpen(false);
+                  setTaskForm(emptyTaskForm);
+                }}
+                className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSendTaskSubmit} className="mt-6 space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Project</span>
+                  <select
+                    name="project_id"
+                    value={taskForm.project_id}
+                    onChange={updateTaskForm}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((project) => (
+                      <option key={project.id || project._id} value={project.id || project._id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Assign to</span>
+                  <select
+                    name="assignee_id"
+                    value={taskForm.assignee_id}
+                    onChange={updateTaskForm}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  >
+                    <option value="">Select team member</option>
+                    {members.map((member) => (
+                      <option key={member.id || member.user_id} value={member.id || member.user_id}>
+                        {member.full_name || member.name || member.email || "Team member"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="block space-y-2 text-sm font-medium text-slate-700">
+                <span>Task title</span>
+                <input
+                  type="text"
+                  name="title"
+                  value={taskForm.title}
+                  onChange={updateTaskForm}
+                  placeholder="e.g. Update the onboarding checklist"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                />
+              </label>
+
+              <label className="block space-y-2 text-sm font-medium text-slate-700">
+                <span>Description</span>
+                <textarea
+                  name="description"
+                  value={taskForm.description}
+                  onChange={updateTaskForm}
+                  rows={4}
+                  placeholder="Add task details, expected results, and notes for the team member."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Priority</span>
+                  <select
+                    name="priority"
+                    value={taskForm.priority}
+                    onChange={updateTaskForm}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Due date</span>
+                  <input
+                    type="date"
+                    name="due_date"
+                    value={taskForm.due_date}
+                    onChange={updateTaskForm}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSendTaskOpen(false);
+                    setTaskForm(emptyTaskForm);
+                  }}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingTask}
+                  className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingTask ? "Sending..." : "Send task"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
