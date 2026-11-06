@@ -6,6 +6,7 @@ const pool = require("../src/config/db");
 
 process.env.NODE_ENV = "test";
 process.env.ADMIN_INVITE_CODE = "test-admin-invitation-code";
+process.env.CLIENT_URL = "https://team-workflow-platform-sslh.vercel.app";
 process.env.JWT_SECRET = "test-only-jwt-secret";
 
 const app = require("../src/app");
@@ -48,6 +49,23 @@ test("client routes fall back to the application", async () => {
 
   assert.equal(response.status, 200);
   assert.match(await response.text(), /<div id="root"><\/div>/);
+});
+
+test("allows requests from the deployed frontend origin", async () => {
+  const response = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "OPTIONS",
+    headers: {
+      Origin: process.env.CLIENT_URL,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type",
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    process.env.CLIENT_URL
+  );
 });
 
 test("unknown API routes retain JSON not-found responses", async () => {

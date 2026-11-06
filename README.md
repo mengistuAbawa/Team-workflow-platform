@@ -43,7 +43,21 @@ currency, and hire date, and is linked to the member's login account. These
 fields are not collected during public self-registration and are available
 only through administrator-protected APIs.
 
-## Deploying to Render
+## Deploying to Vercel and Render
+
+For a separate Vercel frontend and Render API, configure the Vercel project's
+`VITE_API_URL` environment variable as
+`https://team-workflow-platform-2ef1.onrender.com/api` for each environment
+you deploy, then redeploy the frontend. The client also appends `/api` if the
+variable is set to only the Render service origin.
+
+On Render, set `CLIENT_URL` to
+`https://team-workflow-platform-sslh.vercel.app` so the API allows browser
+requests from the deployed frontend. The Blueprint below sets this origin.
+If you use an existing Render service that is not managed by the Blueprint,
+add `CLIENT_URL` manually in its Environment settings.
+
+## Deploying the combined app to Render
 
 The root [`render.yaml`](./render.yaml) Blueprint deploys the React client and
 API together on one Render web service. The app is available at `/` and its API
@@ -67,7 +81,9 @@ For an existing Render service, update **Settings → Build & Deploy**:
   `npm --prefix client ci && VITE_API_URL=/api npm --prefix client run build && npm --prefix server ci`.
 - Set **Start Command** to `npm --prefix server start`.
 - In **Environment**, set `DATABASE_URL` to the Neon connection string and
-  `NODE_ENV` to `production`. Keep the Neon URL on the server service only.
+  `NODE_ENV` to `production`. Set `CLIENT_URL` to the deployed frontend's
+  origin (for example, `https://team-workflow-platform-sslh.vercel.app`).
+  Keep the Neon URL on the server service only.
 - Save and deploy the latest commit.
 
 The API applies `database/schema.sql` during startup. Existing MySQL/XAMPP data

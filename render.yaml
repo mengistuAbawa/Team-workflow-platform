@@ -10,6 +10,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: CLIENT_URL
+        value: https://team-workflow-platform-sslh.vercel.app
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
