@@ -1,18 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, FolderKanban } from "lucide-react";
 import projectService from "../services/projectService";
+import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function CreateProject() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [managers, setManagers] = useState([]);
   const [form, setForm] = useState({
     name: "",
     description: "",
     status: "planning",
     due_date: "",
+    manager_id: "",
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    api.get("/team")
+      .then((response) => {
+        const members = response.data?.data?.members ?? [];
+        setManagers(members.filter((member) => member.role === "manager"));
+      })
+      .catch((requestError) => {
+        setError(
+          requestError.response?.data?.message ||
+            "Could not load managers for this project.",
+        );
+      });
+  }, [user?.role]);
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -27,6 +47,7 @@ export default function CreateProject() {
       const response = await projectService.create({
         ...form,
         due_date: form.due_date || null,
+        manager_id: user?.role === "admin" ? Number(form.manager_id) : null,
       });
       const project = response.data?.data?.project ?? response.data?.project ?? response.data?.data ?? response.data;
       const projectId = project?.id ?? project?.insertId;
@@ -87,9 +108,34 @@ export default function CreateProject() {
             </label>
           </div>
 
+          {user?.role === "admin" && (
+            <label className="block space-y-1.5">
+              <span className="text-sm font-semibold text-slate-700">Assign project manager</span>
+              <select
+                name="manager_id"
+                value={form.manager_id}
+                onChange={updateField}
+                required
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+              >
+                <option value="">Choose a manager</option>
+                {managers.map((manager) => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.full_name} · {manager.email}
+                  </option>
+                ))}
+              </select>
+              {managers.length === 0 && (
+                <span className="text-xs text-amber-700">
+                  Create or activate a manager account before creating this project.
+                </span>
+              )}
+            </label>
+          )}
+
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
             <Link to="/projects" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</Link>
-            <button type="submit" disabled={saving} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60">
+            <button type="submit" disabled={saving || (user?.role === "admin" && !managers.length)} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60">
               {saving ? "Creating..." : "Create project"}
             </button>
           </div>
@@ -98,4 +144,3 @@ export default function CreateProject() {
     </div>
   );
 }
-

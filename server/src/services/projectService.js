@@ -46,6 +46,7 @@ const projectService = {
       status = "planning",
       start_date = null,
       due_date = null,
+      manager_id = null,
     } = projectData;
 
     const connection = await pool.getConnection();
@@ -75,6 +76,17 @@ const projectService = {
          VALUES (?, ?, 'manager')`,
         [result.insertId, ownerId]
       );
+
+      if (manager_id && Number(manager_id) !== Number(ownerId)) {
+        await connection.execute(
+          `INSERT INTO project_members
+            (project_id, user_id, project_role)
+           VALUES (?, ?, 'manager')
+           ON CONFLICT (project_id, user_id)
+           DO UPDATE SET project_role = 'manager'`,
+          [result.insertId, manager_id],
+        );
+      }
 
       await connection.commit();
 

@@ -15,6 +15,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const activityReportRoutes = require("./routes/activityReportRoutes");
 
 const {
   notFound,
@@ -69,6 +70,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reports", activityReportRoutes);
 
 const clientBuildPath = path.resolve(__dirname, "../../client/dist");
 

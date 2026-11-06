@@ -18,6 +18,7 @@ import CreateProject from "./pages/CreateProject";
 import Settings from "./pages/Settings";
 import Team from "./pages/Team";
 import Messages from "./pages/Messages";
+import ActivityReports from "./pages/ActivityReports";
 import ProjectTasks from "./pages/projects/ProjectTasks";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
@@ -97,6 +98,7 @@ function AppRoutes() {
 
           {/* Other pages */}
           <Route path="/tasks" element={<MyTasks />} />
+          <Route path="/reports" element={<ActivityReports />} />
           <Route path="/team" element={<Team />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/calendar" element={<Calendar />} />

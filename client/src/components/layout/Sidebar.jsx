@@ -12,6 +12,7 @@ import {
   X,
   ShieldCheck,
   ClipboardList,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
@@ -21,6 +22,7 @@ import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
 const commonLinks = [
   { label: "Projects", path: "/projects", icon: FolderKanban },
   { label: "My Tasks", path: "/tasks", icon: CheckSquare },
+  { label: "Daily Reports", path: "/reports", icon: FileText },
   { label: "Team", path: "/team", icon: Users },
   { label: "Messages", path: "/messages", icon: MessageCircle },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
@@ -56,11 +58,11 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#17172E] text-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 min-h-0 flex-col overflow-y-auto overscroll-contain bg-[#17172E] text-white transition-transform duration-200 lg:static lg:h-dvh lg:z-auto lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-[76px] items-center justify-between border-b border-white/10 px-6">
+        <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-white/10 px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500">
               <Zap size={22} fill="currentColor" />
@@ -80,7 +82,7 @@ export default function Sidebar({ open, onClose }) {
           </button>
         </div>
 
-        <div className="px-4 pt-7">
+        <div className="shrink-0 px-4 pt-7">
           <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
             Workspace
           </p>
@@ -139,7 +141,7 @@ export default function Sidebar({ open, onClose }) {
           </nav>
         </div>
 
-        <div className="mt-auto p-4">
+        <div className="mt-auto shrink-0 p-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-2 flex items-center gap-2 text-violet-300">
               <Zap size={17} />

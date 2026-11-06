@@ -1,5 +1,6 @@
 ﻿const projectService = require("../services/projectService");
 const taskService = require("../services/taskService");
+const pool = require("../config/db");
 const {
   isValidId,
   isValidProjectStatus,
@@ -54,6 +55,7 @@ const createProject = asyncHandler(async (req, res) => {
     due_date = null,
     start_date = null,
     color,
+    manager_id = null,
   } = req.body;
   if (!isNonEmptyString(name, 150))
     return sendError(
@@ -74,6 +76,21 @@ const createProject = asyncHandler(async (req, res) => {
     (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))
   )
     return sendError(res, 400, "Project color must be a six-digit hex color.");
+  if (req.user.role === "admin" && !isValidId(manager_id))
+    return sendError(res, 400, "Choose a manager for this project.");
+  if (manager_id !== null && !isValidId(manager_id))
+    return sendError(res, 400, "Invalid manager ID.");
+  if (manager_id !== null && req.user.role !== "admin")
+    return sendError(res, 403, "Only admins can assign a project manager.");
+
+  if (manager_id !== null) {
+    const [managers] = await pool.execute(
+      "SELECT id FROM users WHERE id = ? AND role = 'manager' AND is_active = 1",
+      [Number(manager_id)],
+    );
+    if (!managers.length)
+      return sendError(res, 400, "Choose an active manager.");
+  }
 
   const project = await projectService.create(
     {
@@ -82,6 +99,7 @@ const createProject = asyncHandler(async (req, res) => {
       status,
       due_date,
       start_date,
+      manager_id,
       ...(color ? { color } : {}),
     },
     req.user.id,
@@ -179,6 +197,16 @@ const addProjectMember = asyncHandler(async (req, res) => {
     return sendError(res, 400, "A valid user_id is required.");
   if (!["member", "manager"].includes(projectRole))
     return sendError(res, 400, "Invalid project role.");
+  if (projectRole === "manager" && req.user.role !== "admin")
+    return sendError(res, 403, "Only admins can assign project managers.");
+  if (projectRole === "manager") {
+    const [managers] = await pool.execute(
+      "SELECT id FROM users WHERE id = ? AND role = 'manager' AND is_active = 1",
+      [Number(userId)],
+    );
+    if (!managers.length)
+      return sendError(res, 400, "Choose an active manager.");
+  }
   await projectService.addMember(req.params.id, userId, projectRole);
   res.status(201).json({ success: true, message: "Project member added." });
 });

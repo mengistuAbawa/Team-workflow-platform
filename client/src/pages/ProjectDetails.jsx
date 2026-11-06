@@ -45,6 +45,7 @@ export default function ProjectDetails() {
   const [members, setMembers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState("");
+  const [selectedMemberRole, setSelectedMemberRole] = useState("member");
   const [addingMember, setAddingMember] = useState(false);
 
   // Task creation modal
@@ -117,8 +118,10 @@ export default function ProjectDetails() {
     try {
       await api.post(`/projects/${id}/members`, {
         user_id: Number(selectedMember),
+        project_role: selectedMemberRole,
       });
       setSelectedMember("");
+      setSelectedMemberRole("member");
       await loadProject();
     } catch (err) {
       setError(
@@ -385,7 +388,7 @@ export default function ProjectDetails() {
             <div>
               <h2 className="font-bold text-slate-900">Project collaborators</h2>
               <p className="mt-1 text-sm text-slate-500">
-                {members.map((m) => m.full_name).join(", ") ||
+                {members.map((m) => `${m.full_name} (${m.project_role})`).join(", ") ||
                   "No collaborators yet"}
               </p>
             </div>
@@ -410,6 +413,17 @@ export default function ProjectDetails() {
                     </option>
                   ))}
               </select>
+              {user?.role === "admin" && (
+                  <select
+                    aria-label="Project role"
+                    value={selectedMemberRole}
+                    onChange={(event) => setSelectedMemberRole(event.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-500"
+                  >
+                    <option value="member">Team member</option>
+                    <option value="manager">Project manager</option>
+                  </select>
+              )}
               <button
                 disabled={!selectedMember || addingMember}
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
