@@ -21,14 +21,18 @@ async function authenticate(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
     const [users] = await pool.execute(
-      `SELECT id, full_name, email, avatar, role, is_active
+      `SELECT id, full_name, email, avatar, role, is_active, approval_status
        FROM users
        WHERE id = ?
        LIMIT 1`,
       [payload.sub]
     );
 
-    if (!users.length || !users[0].is_active) {
+    if (
+      !users.length ||
+      !users[0].is_active ||
+      users[0].approval_status === "pending"
+    ) {
       return res.status(401).json({
         success: false,
         message: "Your account is unavailable."

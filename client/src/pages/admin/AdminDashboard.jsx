@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   ShieldAlert,
   Users,
@@ -9,17 +8,13 @@ import {
   AlertTriangle,
   Search,
   RefreshCw,
-  MoreVertical,
   Activity,
   Edit2,
   Trash2,
   Power,
   ShieldCheck,
-  Briefcase,
   Layers,
-  Clock,
   AlertCircle,
-  KeyRound,
 } from "lucide-react";
 import adminService from "../../services/adminService";
 import Loader from "../../components/common/Loader";
@@ -30,6 +25,132 @@ const roleBadges = {
   manager: "bg-blue-100 text-blue-800 border-blue-200",
   member: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
+
+function emptyDeveloperProfile() {
+  return {
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
+    jobTitle: "",
+    seniorityLevel: "",
+    department: "",
+    employmentStatus: "Full-Time",
+    baseSalary: "",
+    currency: "USD",
+    hireDate: "",
+  };
+}
+
+function DeveloperProfileFields({ value, onChange, idPrefix }) {
+  const update = (field, fieldValue) =>
+    onChange({ ...value, [field]: fieldValue });
+  const inputClass =
+    "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100";
+
+  return (
+    <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
+      <legend className="px-1 text-sm font-bold text-slate-800">
+        Team Member Profile
+      </legend>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          ["firstName", "First Name", true, 50],
+          ["lastName", "Last Name", true, 50],
+          ["phoneNumber", "Phone Number", false, 20],
+          ["jobTitle", "Job Title", true, 50],
+          ["seniorityLevel", "Seniority Level", false, 30],
+          ["department", "Department", false, 50],
+        ].map(([field, label, required, maxLength]) => (
+          <label
+            key={field}
+            htmlFor={`${idPrefix}-${field}`}
+            className="block text-xs font-semibold text-slate-600"
+          >
+            {label}{required ? " *" : ""}
+            <input
+              id={`${idPrefix}-${field}`}
+              type="text"
+              required={required}
+              maxLength={maxLength}
+              value={value[field]}
+              onChange={(event) => update(field, event.target.value)}
+              className={`${inputClass} mt-1`}
+            />
+          </label>
+        ))}
+        <label
+          htmlFor={`${idPrefix}-employmentStatus`}
+          className="block text-xs font-semibold text-slate-600"
+        >
+          Employment Status *
+          <select
+            id={`${idPrefix}-employmentStatus`}
+            required
+            value={value.employmentStatus}
+            onChange={(event) => update("employmentStatus", event.target.value)}
+            className={`${inputClass} mt-1`}
+          >
+            {["Full-Time", "Part-Time", "Contract", "Intern", "Other"].map(
+              (status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
+        <label
+          htmlFor={`${idPrefix}-baseSalary`}
+          className="block text-xs font-semibold text-slate-600"
+        >
+          Base Salary *
+          <input
+            id={`${idPrefix}-baseSalary`}
+            type="number"
+            required
+            min="0"
+            max="99999999.99"
+            step="0.01"
+            value={value.baseSalary}
+            onChange={(event) => update("baseSalary", event.target.value)}
+            className={`${inputClass} mt-1`}
+          />
+        </label>
+        <label
+          htmlFor={`${idPrefix}-currency`}
+          className="block text-xs font-semibold text-slate-600"
+        >
+          Currency *
+          <input
+            id={`${idPrefix}-currency`}
+            type="text"
+            required
+            minLength={3}
+            maxLength={3}
+            pattern="[A-Za-z]{3}"
+            value={value.currency}
+            onChange={(event) => update("currency", event.target.value)}
+            className={`${inputClass} mt-1`}
+          />
+        </label>
+        <label
+          htmlFor={`${idPrefix}-hireDate`}
+          className="block text-xs font-semibold text-slate-600"
+        >
+          Hire Date *
+          <input
+            id={`${idPrefix}-hireDate`}
+            type="date"
+            required
+            value={value.hireDate}
+            onChange={(event) => update("hireDate", event.target.value)}
+            className={`${inputClass} mt-1`}
+          />
+        </label>
+      </div>
+    </fieldset>
+  );
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -47,6 +168,7 @@ export default function AdminDashboard() {
     email: "",
     password: "",
     role: "member",
+    developerProfile: emptyDeveloperProfile(),
   });
 
   // Edit User Modal
@@ -59,6 +181,7 @@ export default function AdminDashboard() {
     role: "member",
     is_active: 1,
     password: "",
+    developerProfile: emptyDeveloperProfile(),
   });
 
   const loadAdminData = useCallback(async () => {
@@ -93,13 +216,21 @@ export default function AdminDashboard() {
     setError("");
 
     try {
-      await adminService.createUser(createForm);
+      const payload = {
+        ...createForm,
+        fullName:
+          createForm.role === "member"
+            ? `${createForm.developerProfile.firstName} ${createForm.developerProfile.lastName}`.trim()
+            : createForm.fullName,
+      };
+      await adminService.createUser(payload);
       setCreateModalOpen(false);
       setCreateForm({
         fullName: "",
         email: "",
         password: "",
         role: "member",
+        developerProfile: emptyDeveloperProfile(),
       });
       await loadAdminData();
     } catch (err) {
@@ -110,6 +241,7 @@ export default function AdminDashboard() {
   }
 
   function openEditModal(u) {
+    const nameParts = u.full_name.trim().split(/\s+/);
     setEditForm({
       id: u.id,
       full_name: u.full_name,
@@ -117,6 +249,20 @@ export default function AdminDashboard() {
       role: u.role,
       is_active: u.is_active,
       password: "",
+      developerProfile: {
+        firstName: u.developer_first_name || nameParts.shift() || "",
+        lastName: u.developer_last_name || nameParts.join(" "),
+        phoneNumber: u.developer_phone_number || "",
+        jobTitle: u.developer_job_title || "",
+        seniorityLevel: u.developer_seniority_level || "",
+        department: u.developer_department || "",
+        employmentStatus: u.developer_employment_status || "Full-Time",
+        baseSalary: u.developer_base_salary ?? "",
+        currency: u.developer_currency || "USD",
+        hireDate: u.developer_hire_date
+          ? String(u.developer_hire_date).slice(0, 10)
+          : "",
+      },
     });
     setEditModalOpen(true);
   }
@@ -128,13 +274,19 @@ export default function AdminDashboard() {
 
     try {
       const payload = {
-        full_name: editForm.full_name,
+        full_name:
+          editForm.role === "member"
+            ? `${editForm.developerProfile.firstName} ${editForm.developerProfile.lastName}`.trim()
+            : editForm.full_name,
         email: editForm.email,
         role: editForm.role,
         is_active: editForm.is_active,
       };
-      if (editForm.password.trim()) {
-        payload.password = editForm.password.trim();
+      if (editForm.role === "member") {
+        payload.developerProfile = editForm.developerProfile;
+      }
+      if (editForm.password.length > 0) {
+        payload.password = editForm.password;
       }
 
       await adminService.updateUser(editForm.id, payload);
@@ -184,6 +336,9 @@ export default function AdminDashboard() {
     const matchesRole = roleFilter === "all" || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+  const pendingAdminRequests = users.filter(
+    (u) => u.role === "admin" && u.approval_status === "pending",
+  );
 
   if (loading && !stats) return <Loader label="Loading administrative console..." />;
 
@@ -241,6 +396,59 @@ export default function AdminDashboard() {
           <AlertCircle size={18} />
           {error}
         </div>
+      )}
+
+      {pendingAdminRequests.length > 0 && (
+        <section
+          aria-labelledby="pending-admin-requests-title"
+          className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <AlertTriangle size={20} />
+              </span>
+              <div>
+                <h2
+                  id="pending-admin-requests-title"
+                  className="font-bold text-amber-950"
+                >
+                  Administrator approval requests
+                </h2>
+                <p className="text-sm text-amber-800">
+                  {pendingAdminRequests.length} request
+                  {pendingAdminRequests.length === 1 ? "" : "s"} awaiting your review
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-amber-200 px-3 py-1 text-sm font-bold text-amber-900">
+              {pendingAdminRequests.length} pending
+            </span>
+          </div>
+          <ul className="divide-y divide-amber-200">
+            {pendingAdminRequests.map((request) => (
+              <li
+                key={request.id}
+                className="flex flex-wrap items-center justify-between gap-4 bg-white/70 px-5 py-4"
+              >
+                <div>
+                  <p className="font-semibold text-slate-900">
+                    {request.full_name}
+                  </p>
+                  <p className="text-sm text-slate-600">{request.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus(request)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                >
+                  <CheckCircle2 size={16} />
+                  Approve administrator
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Global Metrics Grid */}
@@ -383,6 +591,8 @@ export default function AdminDashboard() {
               {filteredUsers.map((u) => {
                 const badge = roleBadges[u.role] || roleBadges.member;
                 const isActive = u.is_active === 1 || u.is_active === true;
+                const isPendingApproval =
+                  u.role === "admin" && u.approval_status === "pending";
 
                 return (
                   <tr key={u.id} className="transition hover:bg-slate-50/80">
@@ -414,15 +624,27 @@ export default function AdminDashboard() {
                     <td className="px-5 py-4">
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                          isActive ? "text-emerald-700" : "text-slate-400"
+                          isPendingApproval
+                            ? "text-amber-700"
+                            : isActive
+                              ? "text-emerald-700"
+                              : "text-slate-400"
                         }`}
                       >
                         <span
                           className={`size-2 rounded-full ${
-                            isActive ? "bg-emerald-500" : "bg-slate-300"
+                            isPendingApproval
+                              ? "bg-amber-500"
+                              : isActive
+                                ? "bg-emerald-500"
+                                : "bg-slate-300"
                           }`}
                         />
-                        {isActive ? "Active" : "Deactivated"}
+                        {isPendingApproval
+                          ? "Pending approval"
+                          : isActive
+                            ? "Active"
+                            : "Deactivated"}
                       </span>
                     </td>
 
@@ -455,7 +677,13 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(u)}
-                          title={isActive ? "Deactivate account" : "Activate account"}
+                          title={
+                            isPendingApproval
+                              ? "Approve administrator"
+                              : isActive
+                                ? "Deactivate account"
+                                : "Activate account"
+                          }
                           className={`rounded-lg border p-2 ${
                             isActive
                               ? "border-amber-200 text-amber-600 hover:bg-amber-50"
@@ -567,22 +795,24 @@ export default function AdminDashboard() {
         description="Admin provisions member, manager, or administrator accounts."
       >
         <form onSubmit={handleCreateUser} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              required
-              maxLength={120}
-              value={createForm.fullName}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, fullName: e.target.value })
-              }
-              placeholder="e.g. Sarah Jenkins"
-              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100"
-            />
-          </div>
+          {createForm.role !== "member" && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={120}
+                value={createForm.fullName}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, fullName: e.target.value })
+                }
+                placeholder="e.g. Sarah Jenkins"
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100"
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">
@@ -591,7 +821,7 @@ export default function AdminDashboard() {
             <input
               type="email"
               required
-              maxLength={190}
+              maxLength={createForm.role === "member" ? 100 : 190}
               value={createForm.email}
               onChange={(e) =>
                 setCreateForm({ ...createForm, email: e.target.value })
@@ -636,6 +866,16 @@ export default function AdminDashboard() {
             </select>
           </div>
 
+          {createForm.role === "member" && (
+            <DeveloperProfileFields
+              value={createForm.developerProfile}
+              onChange={(developerProfile) =>
+                setCreateForm({ ...createForm, developerProfile })
+              }
+              idPrefix="create-developer"
+            />
+          )}
+
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               type="button"
@@ -665,26 +905,12 @@ export default function AdminDashboard() {
         <form onSubmit={handleUpdateUser} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={editForm.full_name}
-              onChange={(e) =>
-                setEditForm({ ...editForm, full_name: e.target.value })
-              }
-              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-purple-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">
               Email Address *
             </label>
             <input
               type="email"
               required
+              maxLength={editForm.role === "member" ? 100 : 190}
               value={editForm.email}
               onChange={(e) =>
                 setEditForm({ ...editForm, email: e.target.value })
@@ -693,6 +919,22 @@ export default function AdminDashboard() {
             />
           </div>
 
+          {editForm.role !== "member" && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={editForm.full_name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, full_name: e.target.value })
+                }
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-purple-500"
+              />
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">
               System Role *
@@ -710,12 +952,23 @@ export default function AdminDashboard() {
             </select>
           </div>
 
+          {editForm.role === "member" && (
+            <DeveloperProfileFields
+              value={editForm.developerProfile}
+              onChange={(developerProfile) =>
+                setEditForm({ ...editForm, developerProfile })
+              }
+              idPrefix="edit-developer"
+            />
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">
               Reset Password (optional)
             </label>
             <input
               type="password"
+              autoComplete="new-password"
               minLength={8}
               placeholder="Leave blank to keep existing password"
               value={editForm.password}

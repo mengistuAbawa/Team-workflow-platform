@@ -21,6 +21,7 @@ import Messages from "./pages/Messages";
 import ProjectTasks from "./pages/projects/ProjectTasks";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
+import PublicDashboard from "./pages/PublicDashboard";
 import { useAuth } from "./context/AuthContext";
 
 // Temporary page for features that are not implemented yet.
@@ -51,7 +52,7 @@ function RoleRedirect() {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <PublicDashboard />;
   }
 
   return <Navigate to={getRoleDashboardPath(user.role)} replace />;

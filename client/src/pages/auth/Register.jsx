@@ -4,8 +4,8 @@ import {
   Zap,
   ArrowRight,
   ShieldCheck,
-  ClipboardList,
   User,
+  KeyRound,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getRoleDashboardPath } from "../../routes/ProtectedRoute";
@@ -20,16 +20,6 @@ const roleOptions = [
     ring: "focus:ring-emerald-100",
     border: "border-emerald-300",
     bg: "bg-emerald-50",
-  },
-  {
-    value: "manager",
-    label: "Manager",
-    icon: ClipboardList,
-    description: "Create projects, assign tasks, and review work.",
-    accent: "text-blue-600",
-    ring: "focus:ring-blue-100",
-    border: "border-blue-300",
-    bg: "bg-blue-50",
   },
   {
     value: "admin",
@@ -53,9 +43,11 @@ export default function Register() {
     password: "",
     confirmPassword: "",
     role: "member",
+    adminInvitationCode: "",
   });
 
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function updateField(event) {
@@ -68,6 +60,7 @@ export default function Register() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     if (form.password !== form.confirmPassword) {
       setError("The passwords do not match.");
@@ -82,14 +75,24 @@ export default function Register() {
     setSubmitting(true);
 
     try {
-      const newUser = await register({
+      const registration = await register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
         role: form.role,
+        ...(form.role === "admin"
+          ? { adminInvitationCode: form.adminInvitationCode }
+          : {}),
       });
 
-      navigate(getRoleDashboardPath(newUser.role), { replace: true });
+      if (registration.requiresApproval) {
+        setSuccess(
+          "Your administrator account is awaiting approval from an existing administrator. You can sign in after it is approved.",
+        );
+        return;
+      }
+
+      navigate(getRoleDashboardPath(registration.user.role), { replace: true });
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -123,6 +126,14 @@ export default function Register() {
             className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
           >
             {error}
+          </div>
+        )}
+        {success && (
+          <div
+            role="status"
+            className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+          >
+            {success}
           </div>
         )}
 
@@ -213,7 +224,7 @@ export default function Register() {
 
           <div>
             <span className="mb-2 block text-sm font-medium text-slate-700">
-              Select your role
+              Account type
             </span>
             <div className="space-y-2.5">
               {roleOptions.map((option) => {
@@ -273,6 +284,38 @@ export default function Register() {
               })}
             </div>
           </div>
+
+          {form.role === "admin" && (
+            <div>
+              <label
+                htmlFor="adminInvitationCode"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Administrator invitation code
+              </label>
+              <div className="relative">
+                <KeyRound
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  id="adminInvitationCode"
+                  name="adminInvitationCode"
+                  type="password"
+                  autoComplete="off"
+                  required
+                  maxLength={256}
+                  value={form.adminInvitationCode}
+                  onChange={updateField}
+                  placeholder="Enter your invitation code"
+                  className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                />
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Administrator accounts require approval before sign-in.
+              </p>
+            </div>
+          )}
 
           <button
             type="submit"

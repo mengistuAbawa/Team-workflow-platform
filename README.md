@@ -9,8 +9,8 @@
    ```
 
 2. Copy `server/.env.example` to `server/.env` and set the PostgreSQL
-   connection details. The local development password requested for this setup
-   is `1234`.
+   connection details and a private `ADMIN_INVITE_CODE`. Keep this code
+   server-side and share it only with people requesting administrator access.
 3. Install and start the API:
 
    ```powershell
@@ -32,6 +32,17 @@
 The client uses `http://localhost:5000/api` by default. Keep `server/.env`
 local; it is excluded from version control.
 
+Team members can register and sign in immediately. Public administrator
+registration requires `ADMIN_INVITE_CODE` and creates a pending account;
+an existing administrator must approve it from the admin user list before it
+can sign in. Manager accounts are assigned by an administrator.
+
+Administrators create and maintain team-member developer profiles from the
+admin user forms. The profile stores contact and employment details, salary,
+currency, and hire date, and is linked to the member's login account. These
+fields are not collected during public self-registration and are available
+only through administrator-protected APIs.
+
 ## Deploying to Render
 
 The root [`render.yaml`](./render.yaml) Blueprint deploys the React client and
@@ -46,7 +57,8 @@ workloads.
 The service must use the repository root as its root directory so the build
 can include the client and the API startup migration can read
 `database/schema.sql`. The Blueprint builds the client into `client/dist` and
-then starts the API.
+then starts the API. The API serves the client whenever
+`client/dist/index.html` exists; this does not depend on `NODE_ENV`.
 
 For an existing Render service, update **Settings → Build & Deploy**:
 

@@ -59,8 +59,15 @@ router.post(
 
     body("role")
       .optional()
-      .isIn(["admin", "manager", "member"])
-      .withMessage("Role must be admin, manager, or member."),
+      .isIn(["admin", "member"])
+      .withMessage("Public registration is limited to admin or member accounts."),
+
+    body("adminInvitationCode")
+      .optional()
+      .isString()
+      .withMessage("Admin invitation code must be text.")
+      .isLength({ max: 256 })
+      .withMessage("Admin invitation code is too long."),
   ],
   checkValidation,
   register,

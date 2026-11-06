@@ -36,12 +36,21 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (details) => {
     const result = await authService.register(details);
+    if (!result.token) {
+      return {
+        user: result.user,
+        requiresApproval: result.requiresApproval,
+      };
+    }
 
     sessionStorage.setItem(TOKEN_KEY, result.token);
     api.defaults.headers.common.Authorization = `Bearer ${result.token}`;
     setUser(result.user);
 
-    return result.user;
+    return {
+      user: result.user,
+      requiresApproval: result.requiresApproval,
+    };
   }, []);
 
   useEffect(() => {

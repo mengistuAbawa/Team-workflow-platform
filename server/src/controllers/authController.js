@@ -1,6 +1,19 @@
 const bcrypt = require("bcryptjs");
+const { timingSafeEqual } = require("node:crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
+
+function hasValidAdminInvitationCode(code) {
+  const configuredCode = process.env.ADMIN_INVITE_CODE;
+  if (typeof code !== "string" || !configuredCode) return false;
+
+  const supplied = Buffer.from(code);
+  const configured = Buffer.from(configuredCode);
+  return (
+    supplied.length === configured.length &&
+    timingSafeEqual(supplied, configured)
+  );
+}
 
 function createToken(user) {
   if (!process.env.JWT_SECRET) {
@@ -47,10 +60,17 @@ async function register(req, res, next) {
       });
     }
 
-    if (!["admin", "manager", "member"].includes(role)) {
+    if (!["admin", "member"].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Role must be admin, manager, or member.",
+        message: "Public registration is limited to admin or member accounts.",
+      });
+    }
+
+    if (role === "admin" && !hasValidAdminInvitationCode(req.body.adminInvitationCode)) {
+      return res.status(403).json({
+        success: false,
+        message: "A valid administrator invitation code is required.",
       });
     }
 
@@ -67,12 +87,20 @@ async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const requiresApproval = role === "admin";
 
     const [result] = await pool.execute(
-      `INSERT INTO users (full_name, email, password_hash, role)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO users (full_name, email, password_hash, role, is_active, approval_status)
+       VALUES (?, ?, ?, ?, ?, ?)
        RETURNING id`,
-      [fullName, email, passwordHash, role],
+      [
+        fullName,
+        email,
+        passwordHash,
+        role,
+        requiresApproval ? 0 : 1,
+        requiresApproval ? "pending" : "approved",
+      ],
     );
 
     const user = {
@@ -81,14 +109,18 @@ async function register(req, res, next) {
       email,
       avatar: null,
       role,
+      is_active: requiresApproval ? 0 : 1,
+      approval_status: requiresApproval ? "pending" : "approved",
     };
 
-    const token = createToken(user);
+    const token = requiresApproval ? undefined : createToken(user);
 
     return res.status(201).json({
       success: true,
-      message: "Account created successfully.",
-      data: { user, token },
+      message: requiresApproval
+        ? "Administrator account created and awaiting approval."
+        : "Account created successfully.",
+      data: { user, ...(token ? { token } : {}), requiresApproval },
     });
   } catch (error) {
     if (error.code === "23505") {
@@ -196,6 +228,13 @@ async function login(req, res, next) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password.",
+      });
+    }
+
+    if (user.approval_status === "pending") {
+      return res.status(403).json({
+        success: false,
+        message: "This administrator account is awaiting approval.",
       });
     }
 

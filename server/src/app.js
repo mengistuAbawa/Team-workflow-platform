@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const authRoutes = require("./routes/authRoutes");
@@ -69,9 +70,9 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/admin", adminRoutes);
 
-if (process.env.NODE_ENV === "production") {
-  const clientBuildPath = path.resolve(__dirname, "../../client/dist");
+const clientBuildPath = path.resolve(__dirname, "../../client/dist");
 
+if (fs.existsSync(path.join(clientBuildPath, "index.html"))) {
   app.use(express.static(clientBuildPath));
   app.get("/{*path}", (req, res, next) => {
     if (req.path === "/api" || req.path.startsWith("/api/")) {

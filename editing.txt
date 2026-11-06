@@ -1,0 +1,2 @@
+user is admin he must have admin invitetion code =
+team member can create there own account but admin should be approved for login
