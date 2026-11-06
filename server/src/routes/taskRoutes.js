@@ -22,6 +22,8 @@ const requiredMethods = [
   "updateTaskStatus",
   "assignTask",
   "reviewTask",
+  "getTaskSubmissionFiles",
+  "submitTaskFiles",
   "getTaskComments",
   "addTaskComment",
   "deleteTaskComment",
@@ -49,6 +51,10 @@ router.delete("/:id", taskController.deleteTask);
 router.patch("/:id/status", taskController.updateTaskStatus);
 router.patch("/:id/assign", taskController.assignTask);
 router.patch("/:id/review", taskController.reviewTask);
+
+// Task code submission
+router.get("/:id/submission", taskController.getTaskSubmissionFiles);
+router.post("/:id/submission", taskController.submitTaskFiles);
 
 // Task comments
 router.get("/:id/comments", taskController.getTaskComments);

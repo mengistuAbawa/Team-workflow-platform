@@ -734,6 +734,145 @@ exports.assignTask = async (req, res, next) => {
   }
 };
 
+function inferSubmissionLanguage(filePath) {
+  const normalized = String(filePath || "").toLowerCase();
+  if (normalized.endsWith(".js") || normalized.endsWith(".jsx")) return "javascript";
+  if (normalized.endsWith(".ts") || normalized.endsWith(".tsx")) return "typescript";
+  if (normalized.endsWith(".css")) return "css";
+  if (normalized.endsWith(".json")) return "json";
+  if (normalized.endsWith(".md")) return "markdown";
+  if (normalized.endsWith(".html")) return "html";
+  if (normalized.endsWith(".sql")) return "sql";
+  if (normalized.endsWith(".py")) return "python";
+  if (normalized.endsWith(".java")) return "java";
+  if (normalized.endsWith(".php")) return "php";
+  return "text";
+}
+
+async function getTaskSubmissionRows(taskId) {
+  const [rows] = await pool.execute(
+    `SELECT tsf.id, tsf.task_id, tsf.file_path, tsf.file_name, tsf.language,
+            tsf.file_content, tsf.created_at, u.full_name AS uploaded_by_name
+     FROM task_submission_files tsf
+     LEFT JOIN users u ON u.id = tsf.uploaded_by
+     WHERE tsf.task_id = ?
+     ORDER BY tsf.file_path ASC, tsf.created_at DESC`,
+    [Number(taskId)],
+  );
+  return rows;
+}
+
+// GET /api/tasks/:id/submission
+exports.getTaskSubmissionFiles = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!validId(id)) {
+      return sendError(res, 400, "Invalid task ID.");
+    }
+
+    const allowed = await canViewTask(Number(id), getUserId(req), getRole(req));
+    if (!allowed) {
+      return sendError(res, 403, "You do not have access to this task submission.");
+    }
+
+    const files = await getTaskSubmissionRows(Number(id));
+    return res.json({ success: true, data: { files } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/tasks/:id/submission
+exports.submitTaskFiles = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { files } = req.body;
+    const userId = getUserId(req);
+    const role = getRole(req);
+
+    if (!validId(id)) {
+      return sendError(res, 400, "Invalid task ID.");
+    }
+
+    if (!Array.isArray(files) || !files.length) {
+      return sendError(res, 400, "Provide at least one file in the submission.");
+    }
+
+    const [taskRows] = await pool.execute(
+      "SELECT id, assignee_id, project_id FROM tasks WHERE id = ?",
+      [Number(id)],
+    );
+    if (!taskRows.length) {
+      return sendError(res, 404, "Task not found.");
+    }
+
+    const task = taskRows[0];
+    const isAssignee = Number(task.assignee_id) === Number(userId);
+    const canManage = await canManageTask(Number(id), userId, role);
+
+    if (!canManage && !isAssignee) {
+      return sendError(res, 403, "Only the assignee or project manager can submit code for this task.");
+    }
+
+    const filePayload = [];
+    for (const entry of files) {
+      if (!entry || typeof entry !== "object") {
+        return sendError(res, 400, "Each submission file must be an object.");
+      }
+
+      const rawPath = typeof entry.path === "string" ? entry.path.trim() : (typeof entry.file_path === "string" ? entry.file_path.trim() : "");
+      const rawContent = typeof entry.content === "string" ? entry.content : (typeof entry.file_content === "string" ? entry.file_content : "");
+      const fileName = typeof entry.file_name === "string" && entry.file_name.trim()
+        ? entry.file_name.trim()
+        : (rawPath ? rawPath.split(/[\\/]/).pop() : "untitled.txt");
+
+      if (!rawPath) {
+        return sendError(res, 400, "Each file requires a path such as src/App.jsx.");
+      }
+      if (!rawContent) {
+        return sendError(res, 400, `File ${rawPath} has no content.`);
+      }
+
+      filePayload.push({
+        filePath: rawPath,
+        fileName,
+        language: typeof entry.language === "string" && entry.language.trim() ? entry.language.trim() : inferSubmissionLanguage(rawPath),
+        fileContent: rawContent,
+      });
+    }
+
+    await pool.execute("DELETE FROM task_submission_files WHERE task_id = ?", [Number(id)]);
+
+    for (const file of filePayload) {
+      await pool.execute(
+        `INSERT INTO task_submission_files (task_id, uploaded_by, file_path, file_name, language, file_content)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [Number(id), Number(userId), file.filePath, file.fileName, file.language, file.fileContent],
+      );
+    }
+
+    await pool.execute(
+      `UPDATE tasks
+       SET status = CASE WHEN status <> 'done' THEN 'in_review' ELSE status END,
+           review_status = 'pending',
+           review_comment = NULL,
+           reviewed_by = NULL,
+           reviewed_at = NULL
+       WHERE id = ?`,
+      [Number(id)],
+    );
+
+    const filesSaved = await getTaskSubmissionRows(Number(id));
+    return res.status(201).json({
+      success: true,
+      message: "Task code submission sent to manager for review.",
+      data: { files: filesSaved },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/tasks/:id/comments
 exports.getTaskComments = async (req, res, next) => {
   try {

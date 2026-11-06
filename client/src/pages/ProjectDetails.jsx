@@ -35,6 +35,42 @@ function formatDate(value) {
   });
 }
 
+function parseSubmissionDraft(rawValue) {
+  const trimmed = String(rawValue || "").trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((file) => ({
+          path: String(file?.path || file?.file_path || file?.name || "submission.txt"),
+          content: String(file?.content || file?.file_content || file?.code || ""),
+          language: file?.language || "text",
+        }))
+        .filter((file) => file.path && file.content);
+    }
+
+    if (parsed && typeof parsed === "object") {
+      return Object.entries(parsed)
+        .map(([path, content]) => ({
+          path,
+          content: typeof content === "string" ? content : JSON.stringify(content, null, 2),
+          language: path.endsWith(".json") ? "json" : path.endsWith(".js") || path.endsWith(".jsx") ? "javascript" : "text",
+        }))
+        .filter((file) => file.path && file.content);
+    }
+  } catch {
+    // Accept raw code text as a single file submission.
+  }
+
+  return [{
+    path: "submission.txt",
+    content: trimmed,
+    language: "text",
+  }];
+}
+
 export default function ProjectDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -65,6 +101,10 @@ export default function ProjectDetails() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [submissionFiles, setSubmissionFiles] = useState([]);
+  const [selectedSubmissionFile, setSelectedSubmissionFile] = useState(null);
+  const [submissionDraft, setSubmissionDraft] = useState("");
+  const [savingSubmission, setSavingSubmission] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -214,18 +254,66 @@ export default function ProjectDetails() {
     }
   }
 
+  async function loadTaskSubmission(taskId) {
+    try {
+      const res = await api.get(`/tasks/${taskId}/submission`);
+      const files = res.data?.data?.files ?? [];
+      setSubmissionFiles(Array.isArray(files) ? files : []);
+      setSelectedSubmissionFile(Array.isArray(files) && files.length ? files[0] : null);
+    } catch {
+      setSubmissionFiles([]);
+      setSelectedSubmissionFile(null);
+    }
+  }
+
   async function openTaskDetails(task) {
     setSelectedTask(task);
     setCommentDraft("");
+    setSubmissionDraft("");
     setLoadingComments(true);
     try {
-      const res = await api.get(`/tasks/${task.id}/comments`);
-      const payload = res.data?.data?.comments ?? res.data?.data ?? [];
+      const [commentsRes, submissionRes] = await Promise.all([
+        api.get(`/tasks/${task.id}/comments`),
+        api.get(`/tasks/${task.id}/submission`),
+      ]);
+      const payload = commentsRes.data?.data?.comments ?? commentsRes.data?.data ?? [];
       setTaskComments(Array.isArray(payload) ? payload : []);
+      const files = submissionRes.data?.data?.files ?? [];
+      setSubmissionFiles(Array.isArray(files) ? files : []);
+      setSelectedSubmissionFile(Array.isArray(files) && files.length ? files[0] : null);
     } catch {
       setTaskComments([]);
+      setSubmissionFiles([]);
+      setSelectedSubmissionFile(null);
     } finally {
       setLoadingComments(false);
+    }
+  }
+
+  async function handleTaskSubmission(event) {
+    event.preventDefault();
+    if (!selectedTask || !submissionDraft.trim()) return;
+
+    const files = parseSubmissionDraft(submissionDraft);
+    if (!files.length) {
+      setError("Add at least one file path and code snippet for the submission.");
+      return;
+    }
+
+    setSavingSubmission(true);
+    setError("");
+
+    try {
+      const res = await api.post(`/tasks/${selectedTask.id}/submission`, { files });
+      const savedFiles = res.data?.data?.files ?? [];
+      setSubmissionFiles(Array.isArray(savedFiles) ? savedFiles : []);
+      setSelectedSubmissionFile(Array.isArray(savedFiles) && savedFiles.length ? savedFiles[0] : null);
+      setSubmissionDraft("");
+      await updateTaskStatus(selectedTask, "in_review");
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not send the task submission.");
+    } finally {
+      setSavingSubmission(false);
     }
   }
 
@@ -700,6 +788,101 @@ export default function ProjectDetails() {
                   </strong>
                 </span>
               </div>
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-600">
+                    Code delivery
+                  </p>
+                  <h3 className="mt-1 text-base font-bold text-slate-900">
+                    Task submission files
+                  </h3>
+                </div>
+                {(Number(selectedTask.assignee_id) === Number(user?.id) || user?.role === "manager" || user?.role === "admin") && (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                    {submissionFiles.length ? `${submissionFiles.length} file(s)` : "No files yet"}
+                  </span>
+                )}
+              </div>
+
+              {Number(selectedTask.assignee_id) === Number(user?.id) && (
+                <form onSubmit={handleTaskSubmission} className="space-y-3 rounded-xl border border-dashed border-violet-200 bg-white p-3">
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Send code folder / file structure as JSON
+                  </label>
+                  <textarea
+                    rows={8}
+                    value={submissionDraft}
+                    onChange={(e) => setSubmissionDraft(e.target.value)}
+                    placeholder={`[
+  { "path": "src/App.jsx", "content": "export default function App() { return <h1>Hello</h1>; }" },
+  { "path": "src/styles.css", "content": "body { margin: 0; }" }
+]`}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 outline-none focus:border-violet-500 focus:bg-white"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={savingSubmission || !submissionDraft.trim()}
+                      className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingSubmission ? "Sending..." : "Send to manager"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {submissionFiles.length > 0 ? (
+                <div className="grid gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white md:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="border-b border-slate-200 bg-slate-50 p-2 md:border-b-0 md:border-r">
+                    <div className="space-y-1">
+                      {submissionFiles.map((file) => (
+                        <button
+                          key={file.id || `${file.file_path}-${file.created_at}`}
+                          type="button"
+                          onClick={() => setSelectedSubmissionFile(file)}
+                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition ${
+                            selectedSubmissionFile?.id === file.id ||
+                            (selectedSubmissionFile === null && file.file_path === submissionFiles[0]?.file_path)
+                              ? "bg-violet-100 text-violet-700"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          <span className="truncate">{file.file_name || file.file_path}</span>
+                          <span className="ml-2 shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                            {file.language || "txt"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0">
+                    {selectedSubmissionFile ? (
+                      <>
+                        <div className="border-b border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {selectedSubmissionFile.file_path || selectedSubmissionFile.file_name}
+                        </div>
+                        <textarea
+                          value={selectedSubmissionFile.file_content || ""}
+                          readOnly
+                          className="h-[280px] w-full resize-none border-0 bg-transparent p-3 font-mono text-[12px] leading-6 text-slate-700 outline-none"
+                        />
+                      </>
+                    ) : (
+                      <div className="flex h-full items-center justify-center p-6 text-sm text-slate-400">
+                        Select a file to view its code.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No code has been delivered for this task yet. The assignee can send the folder/file structure here.
+                </p>
+              )}
             </div>
 
             {/* Comments Section */}
