@@ -18,7 +18,7 @@ const notificationService = {
     return result.insertId;
   },
 
-  async createForUsers(userIds, notification) {
+  async createForUsers(userIds, notification, connection = pool) {
     const uniqueIds = [
       ...new Set(
         userIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)
@@ -40,7 +40,7 @@ const notificationService = {
         return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`;
       })
       .join(", ");
-    const [result] = await pool.query(
+    const [result] = await connection.query(
       `INSERT INTO notifications (user_id, title, message, link)
        VALUES ${placeholders}`,
       values

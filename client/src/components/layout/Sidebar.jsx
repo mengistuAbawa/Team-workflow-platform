@@ -53,12 +53,12 @@ export default function Sidebar({ open, onClose }) {
         <button
           aria-label="Close navigation"
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/50 xl:hidden"
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 min-h-0 flex-col overflow-y-auto overscroll-contain bg-[#17172E] text-white transition-transform duration-200 lg:static lg:h-dvh lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 min-h-0 flex-col overflow-y-auto overscroll-contain bg-[#17172E] text-white transition-transform duration-200 xl:static xl:h-dvh xl:z-auto xl:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -76,7 +76,7 @@ export default function Sidebar({ open, onClose }) {
           <button
             onClick={onClose}
             aria-label="Close sidebar"
-            className="rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden"
+            className="rounded-lg p-2 text-slate-400 hover:bg-white/10 xl:hidden"
           >
             <X size={19} />
           </button>

@@ -8,7 +8,7 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#F7F8FC] lg:flex">
+    <div className="h-dvh overflow-hidden bg-[#F7F8FC] xl:flex">
       <Sidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

@@ -21,7 +21,7 @@ export default function Navbar({ onMenuClick }) {
         <button
           onClick={onMenuClick}
           aria-label="Open navigation"
-          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 xl:hidden"
         >
           <Menu size={21} />
         </button>

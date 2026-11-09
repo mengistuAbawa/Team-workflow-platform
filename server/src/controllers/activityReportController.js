@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const notificationService = require("../services/notificationService");
 const { isValidDate, isValidId, isNonEmptyString } = require("../utils/validators");
 
 function sendError(res, status, message) {
@@ -21,6 +22,35 @@ async function findReport(reportId) {
     [reportId],
   );
   return rows[0] || null;
+}
+
+async function notifyProjectManagers(connection, projectId, authorId, message) {
+  const [managers] = await connection.execute(
+    `SELECT DISTINCT u.id
+     FROM projects p
+     INNER JOIN users u
+       ON u.role = 'manager'
+       AND (u.id = p.owner_id OR EXISTS (
+         SELECT 1 FROM project_members pm
+         WHERE pm.project_id = p.id AND pm.user_id = u.id
+           AND pm.project_role = 'manager'
+       ))
+     WHERE p.id = ? AND u.id <> ?`,
+    [projectId, authorId],
+  );
+  const managerIds = managers.map((manager) => Number(manager.id));
+  if (!managerIds.length) return false;
+
+  await notificationService.createForUsers(
+    managerIds,
+    {
+      title: "Daily activity report submitted",
+      message,
+      link: "/reports",
+    },
+    connection,
+  );
+  return true;
 }
 
 exports.getReports = async (req, res, next) => {
@@ -66,6 +96,7 @@ exports.getReports = async (req, res, next) => {
 };
 
 exports.createReport = async (req, res, next) => {
+  let connection;
   try {
     const { project_id, activity_date, content } = req.body;
 
@@ -76,24 +107,45 @@ exports.createReport = async (req, res, next) => {
     if (!isNonEmptyString(content, 10000))
       return sendError(res, 400, "Describe your daily activity (up to 10,000 characters).");
 
-    const [projects] = await pool.execute(
-      `SELECT p.id FROM projects p
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [projects] = await connection.execute(
+      `SELECT p.id, p.name FROM projects p
        LEFT JOIN project_members pm
          ON pm.project_id = p.id AND pm.user_id = ?
        WHERE p.id = ? AND (p.owner_id = ? OR pm.user_id IS NOT NULL)
        LIMIT 1`,
       [req.user.id, Number(project_id), req.user.id],
     );
-    if (!projects.length)
+    if (!projects.length) {
+      await connection.rollback();
       return sendError(res, 403, "You must be a project member to submit a report.");
+    }
 
-    const [result] = await pool.execute(
+    const [result] = await connection.execute(
       `INSERT INTO daily_activity_reports
         (project_id, user_id, activity_date, content)
        VALUES (?, ?, ?, ?)
        RETURNING id`,
       [Number(project_id), req.user.id, activity_date, content.trim()],
     );
+    const delivered = await notifyProjectManagers(
+      connection,
+      Number(project_id),
+      Number(req.user.id),
+      `A daily activity report from ${req.user.full_name} for ${projects[0].name} is ready for review.`,
+    );
+    if (!delivered) {
+      await connection.rollback();
+      return sendError(
+        res,
+        409,
+        "This project has no assigned manager to receive reports.",
+      );
+    }
+    await connection.commit();
+
     const report = await findReport(result.insertId);
     return res.status(201).json({
       success: true,
@@ -101,11 +153,15 @@ exports.createReport = async (req, res, next) => {
       data: { report },
     });
   } catch (error) {
+    if (connection) await connection.rollback();
     return next(error);
+  } finally {
+    connection?.release();
   }
 };
 
 exports.updateReport = async (req, res, next) => {
+  let connection;
   try {
     const { id } = req.params;
     const { activity_date, content } = req.body;
@@ -122,7 +178,9 @@ exports.updateReport = async (req, res, next) => {
     if (report.review_stage !== "member_action")
       return sendError(res, 409, "This report is not waiting for your changes.");
 
-    await pool.execute(
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.execute(
       `UPDATE daily_activity_reports
        SET activity_date = ?, content = ?, review_stage = 'manager_review',
            manager_comment = NULL, manager_reviewed_by = NULL,
@@ -130,13 +188,31 @@ exports.updateReport = async (req, res, next) => {
        WHERE id = ?`,
       [activity_date, content.trim(), Number(id)],
     );
+    const delivered = await notifyProjectManagers(
+      connection,
+      Number(report.project_id),
+      Number(req.user.id),
+      `${req.user.full_name} resubmitted a daily activity report for ${report.project_name}.`,
+    );
+    if (!delivered) {
+      await connection.rollback();
+      return sendError(
+        res,
+        409,
+        "This project has no assigned manager to receive reports.",
+      );
+    }
+    await connection.commit();
     return res.json({
       success: true,
       message: "Report updated and resubmitted for manager review.",
       data: { report: await findReport(Number(id)) },
     });
   } catch (error) {
+    if (connection) await connection.rollback();
     return next(error);
+  } finally {
+    connection?.release();
   }
 };
 

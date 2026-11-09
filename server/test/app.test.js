@@ -79,6 +79,106 @@ test("unknown API routes retain JSON not-found responses", async () => {
   });
 });
 
+test("daily activity reports notify the assigned project manager", async () => {
+  const originalExecute = pool.execute;
+  const originalGetConnection = pool.getConnection;
+  const token = jwt.sign({ sub: "3" }, process.env.JWT_SECRET);
+  const transaction = { committed: false, rolledBack: false, notification: null };
+
+  pool.execute = async (sql) => {
+    if (sql.includes("SELECT id, full_name, email, avatar, role, is_active, approval_status")) {
+      return [
+        [
+          {
+            id: 3,
+            full_name: "Team Member",
+            email: "member@example.com",
+            role: "member",
+            is_active: true,
+            approval_status: "approved",
+          },
+        ],
+        [],
+      ];
+    }
+
+    if (sql.includes("SELECT r.*, p.name AS project_name")) {
+      return [
+        [
+          {
+            id: 15,
+            project_id: 7,
+            user_id: 3,
+            project_name: "Launch",
+            content: "Finished the release checklist.",
+          },
+        ],
+        [],
+      ];
+    }
+
+    throw new Error(`Unexpected database query in test: ${sql}`);
+  };
+  pool.getConnection = async () => ({
+    beginTransaction: async () => {},
+    execute: async (sql) => {
+      if (sql.includes("SELECT p.id, p.name FROM projects")) {
+        return [[{ id: 7, name: "Launch" }], []];
+      }
+      if (sql.includes("INSERT INTO daily_activity_reports")) {
+        return [{ insertId: 15 }, []];
+      }
+      if (sql.includes("SELECT DISTINCT u.id")) {
+        return [[{ id: 2 }], []];
+      }
+      throw new Error(`Unexpected transaction query in test: ${sql}`);
+    },
+    query: async (sql, values) => {
+      if (sql.includes("INSERT INTO notifications")) {
+        transaction.notification = { sql, values };
+        return [{ affectedRows: 1 }, []];
+      }
+      throw new Error(`Unexpected transaction query in test: ${sql}`);
+    },
+    commit: async () => {
+      transaction.committed = true;
+    },
+    rollback: async () => {
+      transaction.rolledBack = true;
+    },
+    release: () => {},
+  });
+
+  try {
+    const response = await fetch(`${baseUrl}/api/reports`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        project_id: 7,
+        activity_date: "2026-11-09",
+        content: "Finished the release checklist.",
+      }),
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(transaction.committed, true);
+    assert.equal(transaction.rolledBack, false);
+    assert.match(transaction.notification.sql, /INSERT INTO notifications/);
+    assert.deepEqual(transaction.notification.values, [
+      2,
+      "Daily activity report submitted",
+      "A daily activity report from Team Member for Launch is ready for review.",
+      "/reports",
+    ]);
+  } finally {
+    pool.execute = originalExecute;
+    pool.getConnection = originalGetConnection;
+  }
+});
+
 test("members self-register while admin signup requires approval", async () => {
   const password = "Password123";
   const pendingAdminHash = await bcrypt.hash(password, 4);
