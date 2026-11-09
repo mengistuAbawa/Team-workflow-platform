@@ -409,9 +409,9 @@ export default function ProjectDetails() {
   );
   const canManageTasks =
     user?.role === "admin" ||
-    user?.role === "manager" ||
-    Number(project?.owner_id) === Number(user?.id) ||
-    currentMembership?.project_role === "manager";
+    (user?.role === "manager" &&
+      (Number(project?.owner_id) === Number(user?.id) ||
+        currentMembership?.project_role === "manager"));
 
   return (
     <div className="space-y-6">
@@ -480,28 +480,29 @@ export default function ProjectDetails() {
                   "No collaborators yet"}
               </p>
             </div>
-            <form onSubmit={addCollaborator} className="flex flex-wrap gap-2">
-              <select
-                value={selectedMember}
-                onFocus={loadTeamMembers}
-                onChange={(event) => setSelectedMember(event.target.value)}
-                className="h-10 min-w-48 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-500"
-              >
-                <option value="">Choose a teammate</option>
-                {teamMembers
-                  .filter(
-                    (member) =>
-                      !members.some(
-                        (current) => Number(current.id) === Number(member.id)
-                      )
-                  )
-                  .map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.full_name} &middot; {member.email}
-                    </option>
-                  ))}
-              </select>
-              {user?.role === "admin" && (
+            {canManageTasks && (
+              <form onSubmit={addCollaborator} className="flex flex-wrap gap-2">
+                <select
+                  value={selectedMember}
+                  onFocus={loadTeamMembers}
+                  onChange={(event) => setSelectedMember(event.target.value)}
+                  className="h-10 min-w-48 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-500"
+                >
+                  <option value="">Choose a teammate</option>
+                  {teamMembers
+                    .filter(
+                      (member) =>
+                        !members.some(
+                          (current) => Number(current.id) === Number(member.id)
+                        )
+                    )
+                    .map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.full_name} &middot; {member.email}
+                      </option>
+                    ))}
+                </select>
+                {user?.role === "admin" && (
                   <select
                     aria-label="Project role"
                     value={selectedMemberRole}
@@ -511,15 +512,16 @@ export default function ProjectDetails() {
                     <option value="member">Team member</option>
                     <option value="manager">Project manager</option>
                   </select>
-              )}
-              <button
-                disabled={!selectedMember || addingMember}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <UserPlus size={15} />{" "}
-                {addingMember ? "Adding..." : "Add teammate"}
-              </button>
-            </form>
+                )}
+                <button
+                  disabled={!selectedMember || addingMember}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <UserPlus size={15} />{" "}
+                  {addingMember ? "Adding..." : "Add teammate"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
@@ -582,31 +584,37 @@ export default function ProjectDetails() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setTaskModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
-          >
-            <Plus size={18} /> Add task
-          </button>
+          {canManageTasks && (
+            <button
+              type="button"
+              onClick={() => setTaskModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
+            >
+              <Plus size={18} /> Add task
+            </button>
+          )}
         </div>
 
         <KanbanBoard
           tasks={tasks}
           onTaskStatusChange={updateTaskStatus}
           onTaskClick={openTaskDetails}
-          onCreateTask={() => setTaskModalOpen(true)}
+          onCreateTask={
+            canManageTasks ? () => setTaskModalOpen(true) : undefined
+          }
           updatingTaskId={updatingTaskId}
+          canApprove={canManageTasks}
         />
       </section>
 
       {/* Task Creation Modal */}
-      <Modal
-        isOpen={taskModalOpen}
-        onClose={() => setTaskModalOpen(false)}
-        title="Create task for this project"
-        description="Add a deliverable and assign it to a teammate."
-      >
+      {canManageTasks && (
+        <Modal
+          isOpen={taskModalOpen}
+          onClose={() => setTaskModalOpen(false)}
+          title="Create task for this project"
+          description="Add a deliverable and assign it to a teammate."
+        >
         <form onSubmit={createTask} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">
@@ -718,7 +726,8 @@ export default function ProjectDetails() {
             </button>
           </div>
         </form>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Task Details and Comments Modal */}
       {selectedTask && (
@@ -735,12 +744,15 @@ export default function ProjectDetails() {
                 <select
                   value={selectedTask.status}
                   onChange={(e) => updateTaskStatus(selectedTask, e.target.value)}
+                  disabled={
+                    !canManageTasks && selectedTask.status === "in_review"
+                  }
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none"
                 >
                   <option value="todo">To Do</option>
                   <option value="in_progress">In Progress</option>
                   <option value="in_review">In Review</option>
-                  <option value="done">Done</option>
+                  {canManageTasks && <option value="done">Done</option>}
                 </select>
               </div>
 

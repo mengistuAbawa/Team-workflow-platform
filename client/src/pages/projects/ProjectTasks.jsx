@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, Link } from "react-router-dom";
 import { normalizeApiBaseUrl } from "../../services/apiBaseUrl";
+import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeft,
   Plus,
@@ -59,6 +60,8 @@ function getErrorMessage(error) {
 
 export default function ProjectTasks({ project: projectProp }) {
   const { projectId } = useParams();
+  const { user } = useAuth();
+  const canManageTasks = user?.role === "admin" || user?.role === "manager";
   const project = projectProp;
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -229,18 +232,20 @@ export default function ProjectTasks({ project: projectProp }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm((current) => !current);
-              setError("");
-              setSuccess("");
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
-          >
-            <Plus size={19} />
-            Add Task
-          </button>
+          {canManageTasks && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm((current) => !current);
+                setError("");
+                setSuccess("");
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+            >
+              <Plus size={19} />
+              Add Task
+            </button>
+          )}
         </section>
 
         {error && (
@@ -267,7 +272,7 @@ export default function ProjectTasks({ project: projectProp }) {
           <StatCard label="Completed" value={completedCount} />
         </section>
 
-        {showForm && (
+        {canManageTasks && showForm && (
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-5 text-xl font-bold text-slate-900">
               Create task for this project
@@ -410,18 +415,24 @@ export default function ProjectTasks({ project: projectProp }) {
                 size={44}
               />
               <h3 className="font-semibold text-slate-800">
-                No tasks created yet
+                {canManageTasks
+                  ? "No tasks created yet"
+                  : "No tasks assigned to you yet"}
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                Add your first task and assign it to a team member.
+                {canManageTasks
+                  ? "Add your first task and assign it to a team member."
+                  : "Your manager will assign tasks for this project here."}
               </p>
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700"
-              >
-                + Add your first task
-              </button>
+              {canManageTasks && (
+                <button
+                  type="button"
+                  onClick={() => setShowForm(true)}
+                  className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700"
+                >
+                  + Add your first task
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -467,7 +478,8 @@ export default function ProjectTasks({ project: projectProp }) {
                       </p>
                     </div>
 
-                    <div className="flex flex-col gap-2 sm:flex-row lg:w-80">
+                    {canManageTasks && (
+                      <div className="flex flex-col gap-2 sm:flex-row lg:w-80">
                       <select
                         aria-label={`Reassign ${task.title}`}
                         value={assignments[task.id] || ""}
@@ -505,7 +517,8 @@ export default function ProjectTasks({ project: projectProp }) {
                         )}
                         Assign
                       </button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}

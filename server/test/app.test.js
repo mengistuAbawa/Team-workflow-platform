@@ -3,6 +3,7 @@ const { after, before, test } = require("node:test");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../src/config/db");
+const taskService = require("../src/services/taskService");
 
 process.env.NODE_ENV = "test";
 process.env.ADMIN_INVITE_CODE = "test-admin-invitation-code";
@@ -628,6 +629,160 @@ test("pending administrator requests appear to admins and can be approved", asyn
     assert.equal(approvalResult.data.approval_status, "approved");
     assert.match(approvalUpdate.sql, /approval_status = 'approved'/);
     assert.deepEqual(approvalUpdate.values, [1, "2"]);
+  } finally {
+    pool.execute = originalExecute;
+  }
+});
+
+test("members cannot create projects or tasks, while managers can reach validation", async () => {
+  const originalExecute = pool.execute;
+  const memberToken = jwt.sign({ sub: "3" }, process.env.JWT_SECRET);
+  const managerToken = jwt.sign({ sub: "2" }, process.env.JWT_SECRET);
+
+  pool.execute = async (sql, values) => {
+    if (sql.includes("SELECT id, full_name, email, avatar, role, is_active, approval_status")) {
+      const isManager = Number(values[0]) === 2;
+      return [
+        [
+          {
+            id: isManager ? 2 : 3,
+            full_name: isManager ? "Project Manager" : "Team Member",
+            email: isManager ? "manager@example.com" : "member@example.com",
+            role: isManager ? "manager" : "member",
+            is_active: true,
+            approval_status: "approved",
+          },
+        ],
+        [],
+      ];
+    }
+
+    throw new Error(`Unexpected database query in test: ${sql}`);
+  };
+
+  try {
+    const memberProjectResponse = await fetch(`${baseUrl}/api/projects`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${memberToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "Member project" }),
+    });
+    const memberTaskResponse = await fetch(`${baseUrl}/api/tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${memberToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ project_id: 1, title: "Member task" }),
+    });
+
+    assert.equal(memberProjectResponse.status, 403);
+    assert.equal(memberTaskResponse.status, 403);
+
+    const managerProjectResponse = await fetch(`${baseUrl}/api/projects`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${managerToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    const managerTaskResponse = await fetch(`${baseUrl}/api/tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${managerToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    assert.equal(managerProjectResponse.status, 400);
+    assert.equal(managerTaskResponse.status, 400);
+  } finally {
+    pool.execute = originalExecute;
+  }
+});
+
+test("members cannot access or manage tasks assigned to someone else", async () => {
+  const originalExecute = pool.execute;
+  const memberToken = jwt.sign({ sub: "3" }, process.env.JWT_SECRET);
+
+  pool.execute = async (sql) => {
+    if (sql.includes("SELECT id, full_name, email, avatar, role, is_active, approval_status")) {
+      return [
+        [
+          {
+            id: 3,
+            full_name: "Team Member",
+            email: "member@example.com",
+            role: "member",
+            is_active: true,
+            approval_status: "approved",
+          },
+        ],
+        [],
+      ];
+    }
+
+    if (sql.includes("FROM tasks WHERE id = ? AND assignee_id = ?")) {
+      return [[], []];
+    }
+
+    if (sql.includes("SELECT id, project_id FROM tasks WHERE id = ?")) {
+      return [[{ id: 9, project_id: 1 }], []];
+    }
+
+    if (sql.includes("SELECT id FROM tasks WHERE id = ?")) {
+      return [[{ id: 9 }], []];
+    }
+
+    throw new Error(`Unexpected database query in test: ${sql}`);
+  };
+
+  try {
+    const requestHeaders = { Authorization: `Bearer ${memberToken}` };
+    const getResponse = await fetch(`${baseUrl}/api/tasks/9`, {
+      headers: requestHeaders,
+    });
+    const updateResponse = await fetch(`${baseUrl}/api/tasks/9`, {
+      method: "PUT",
+      headers: {
+        ...requestHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "Changed by member" }),
+    });
+    const deleteResponse = await fetch(`${baseUrl}/api/tasks/9`, {
+      method: "DELETE",
+      headers: requestHeaders,
+    });
+
+    assert.equal(getResponse.status, 403);
+    assert.equal(updateResponse.status, 403);
+    assert.equal(deleteResponse.status, 403);
+  } finally {
+    pool.execute = originalExecute;
+  }
+});
+
+test("member task queries are scoped to assigned tasks", async () => {
+  const originalExecute = pool.execute;
+  let query;
+  let values;
+
+  pool.execute = async (statement, parameters) => {
+    query = statement;
+    values = parameters;
+    return [[], []];
+  };
+
+  try {
+    await taskService.findForUser(3, {}, "member");
+
+    assert.match(query, /WHERE t\.assignee_id = \?/);
+    assert.deepEqual(values, [3, 3]);
   } finally {
     pool.execute = originalExecute;
   }

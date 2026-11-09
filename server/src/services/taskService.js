@@ -27,7 +27,10 @@ const taskService = {
     const conditions = [];
     const values = [];
 
-    if (role !== "admin") {
+    if (role === "member") {
+      conditions.push("t.assignee_id = ?");
+      values.push(userId);
+    } else if (role !== "admin") {
       conditions.push(
         `(p.owner_id = ?
           OR pm.user_id = ?

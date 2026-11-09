@@ -13,12 +13,12 @@ const {
   removeProjectMember,
 } = require("../controllers/projectController");
 
-const { authenticate } = require("../middleware/auth");
+const { authenticate, authorize } = require("../middleware/auth");
 
 router.use(authenticate);
 
 router.get("/", getProjects);
-router.post("/", createProject);
+router.post("/", authorize("admin", "manager"), createProject);
 router.get("/:id/tasks", getProjectTasks);
 router.get("/:id/members", getProjectMembers);
 router.post("/:id/members", addProjectMember);

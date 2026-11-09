@@ -18,29 +18,27 @@ function getRole(req) {
   return String(req.user?.role || "").toLowerCase();
 }
 
-function isManager(req) {
-  return ["admin", "manager"].includes(getRole(req));
-}
-
 function validId(value) {
   return /^\d+$/.test(String(value)) && Number(value) > 0;
 }
 
 async function canManageTask(taskId, userId, role) {
   if (role === "admin") return true;
+  if (role !== "manager") return false;
   const [rows] = await pool.execute(
     `SELECT t.id FROM tasks t
      INNER JOIN projects p ON p.id = t.project_id
      LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
-     WHERE t.id = ? AND (p.owner_id = ? OR pm.project_role = 'manager' OR t.created_by = ?)
+     WHERE t.id = ? AND (p.owner_id = ? OR pm.project_role = 'manager')
      LIMIT 1`,
-    [userId, taskId, userId, userId],
+    [userId, taskId, userId],
   );
   return rows.length > 0;
 }
 
 async function canManageProject(projectId, userId, role) {
   if (role === "admin") return true;
+  if (role !== "manager") return false;
   const [rows] = await pool.execute(
     `SELECT p.id FROM projects p
      LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
@@ -53,6 +51,13 @@ async function canManageProject(projectId, userId, role) {
 
 async function canViewTask(taskId, userId, role) {
   if (role === "admin") return true;
+  if (role === "member") {
+    const [rows] = await pool.execute(
+      "SELECT id FROM tasks WHERE id = ? AND assignee_id = ? LIMIT 1",
+      [taskId, userId],
+    );
+    return rows.length > 0;
+  }
   const [rows] = await pool.execute(
     `SELECT t.id FROM tasks t
      INNER JOIN projects p ON p.id = t.project_id

@@ -24,11 +24,13 @@ async function getAccess(projectId, user) {
   const member = members.find((item) => Number(item.id) === Number(user.id));
   const owner = Number(project.owner_id) === Number(user.id);
   const allowed = user.role === "admin" || owner || Boolean(member);
+  const isManager = user.role === "manager";
   return {
     project,
     allowed,
     manager:
-      user.role === "admin" || owner || member?.project_role === "manager",
+      user.role === "admin" ||
+      (isManager && (owner || member?.project_role === "manager")),
   };
 }
 

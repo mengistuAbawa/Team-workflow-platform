@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { authenticate } = require("../middleware/auth");
+const { authenticate, authorize } = require("../middleware/auth");
 const taskController = require("../controllers/taskController");
 
 // Validate authentication middleware.
@@ -42,7 +42,11 @@ router.use(authenticate);
 
 // Task CRUD
 router.get("/", taskController.getTasks);
-router.post("/", taskController.createTask);
+router.post(
+  "/",
+  authorize("admin", "manager"),
+  taskController.createTask
+);
 router.get("/:id", taskController.getTaskById);
 router.put("/:id", taskController.updateTask);
 router.delete("/:id", taskController.deleteTask);

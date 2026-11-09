@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import projectService from "../services/projectService";
 import Loader from "../components/common/Loader";
+import { useAuth } from "../context/AuthContext";
 
 const statusBadges = {
   planning: "bg-blue-50 text-blue-700 border-blue-200",
@@ -37,6 +38,8 @@ function formatDate(value) {
 }
 
 export default function Projects() {
+  const { user } = useAuth();
+  const canCreateProject = user?.role === "admin" || user?.role === "manager";
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,13 +119,15 @@ export default function Projects() {
             Refresh
           </button>
 
-          <Link
-            to="/projects/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
-          >
-            <Plus size={18} />
-            New Project
-          </Link>
+          {canCreateProject && (
+            <Link
+              to="/projects/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
+            >
+              <Plus size={18} />
+              New Project
+            </Link>
+          )}
         </div>
       </header>
 
@@ -343,15 +348,19 @@ export default function Projects() {
           <p className="mt-1 text-sm text-slate-500">
             {search || statusFilter !== "all"
               ? "Try clearing your filters or changing your search terms."
-              : "Create your first project to start organizing team tasks and collaborating."}
+              : canCreateProject
+                ? "Create your first project to start organizing team tasks and collaborating."
+                : "You will see projects here when a manager assigns you to them."}
           </p>
-          <Link
-            to="/projects/new"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
-          >
-            <Plus size={16} />
-            Create project
-          </Link>
+          {canCreateProject && (
+            <Link
+              to="/projects/new"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
+            >
+              <Plus size={16} />
+              Create project
+            </Link>
+          )}
         </div>
       )}
     </div>

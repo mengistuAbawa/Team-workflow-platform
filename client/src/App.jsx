@@ -83,6 +83,13 @@ function AppRoutes() {
         </Route>
       </Route>
 
+      {/* Project and task creation is reserved for managers and admins. */}
+      <Route element={<ProtectedRoute allowedRoles={["manager", "admin"]} />}>
+        <Route element={<MainLayout />}>
+          <Route path="/projects/new" element={<CreateProject />} />
+        </Route>
+      </Route>
+
       {/* General protected routes (all roles) */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
@@ -90,7 +97,6 @@ function AppRoutes() {
 
           {/* Projects */}
           <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/new" element={<CreateProject />} />
           <Route path="/projects/:id" element={<ProjectDetails />} />
 
           {/* Tasks belonging to a specific project */}
